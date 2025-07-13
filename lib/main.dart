@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
+import 'package:google_fonts/google_fonts.dart';
 
 void main() {
   runApp(HatchTechApp());
@@ -14,6 +15,9 @@ class HatchTechApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: LoginScreen(),
+      theme: ThemeData(
+        textTheme: GoogleFonts.poppinsTextTheme(),
+      ),
     );
   }
 }
@@ -104,11 +108,24 @@ class _DashboardState extends State<Dashboard> {
   };
 
   bool showWarning = false;
+  late Timer dataUpdateTimer;
 
   @override
   void initState() {
     super.initState();
     checkHumidityWarning();
+    dataUpdateTimer = Timer.periodic(Duration(seconds: 5), (_) => updateSensorData());
+  }
+
+  void updateSensorData() {
+    setState(() {
+      incubatorData.forEach((key, value) {
+        value['temperature'] += (Random().nextDouble() - 0.5);
+        value['humidity'] += (Random().nextDouble() - 0.5);
+        value['oxygen'] += (Random().nextDouble() - 0.3);
+        value['co2'] += (Random().nextDouble() - 0.3);
+      });
+    });
   }
 
   void checkHumidityWarning() {
@@ -144,15 +161,19 @@ class _DashboardState extends State<Dashboard> {
   }
 
   void deleteIncubator(String name) {
-    if (incubatorData.length <= 1) return; // Prevent deleting the last incubator
-
+    if (incubatorData.length <= 1) return;
     incubatorData.remove(name);
-
     setState(() {
       selectedIncubator = incubatorData.keys.first;
       showWarning = false;
       checkHumidityWarning();
     });
+  }
+
+  @override
+  void dispose() {
+    dataUpdateTimer.cancel();
+    super.dispose();
   }
 
   @override
@@ -199,109 +220,127 @@ class _DashboardState extends State<Dashboard> {
           IconButton(onPressed: () {}, icon: Icon(Icons.account_circle))
         ],
       ),
-      body: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                Row(
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          int crossAxisCount = constraints.maxWidth > 600 ? 3 : 2;
+          return Stack(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
                   children: [
-                    Expanded(
-                      child: DropdownButtonFormField<String>(
-                        value: selectedIncubator,
-                        items: incubatorData.keys.map((key) {
-                          return DropdownMenuItem(value: key, child: Text(key));
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedIncubator = value!;
-                            showWarning = false;
-                            checkHumidityWarning();
-                          });
-                        },
-                        decoration: InputDecoration(border: OutlineInputBorder()),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<String>(
+                            value: selectedIncubator,
+                            items: incubatorData.keys.map((key) {
+                              return DropdownMenuItem(value: key, child: Text(key));
+                            }).toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                selectedIncubator = value!;
+                                showWarning = false;
+                                checkHumidityWarning();
+                              });
+                            },
+                            decoration: InputDecoration(border: OutlineInputBorder()),
+                          ),
+                        ),
+                        SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          onPressed: addNewIncubator,
+                          icon: Icon(Icons.add),
+                          label: Text('Add'),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                        ),
+                      ],
                     ),
-                    SizedBox(width: 10),
-                    ElevatedButton.icon(
-                      onPressed: addNewIncubator,
-                      icon: Icon(Icons.add),
-                      label: Text('Add'),
-                      style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                    SizedBox(height: 20),
+                    Expanded(
+                      child: GridView.count(
+                        crossAxisCount: crossAxisCount,
+                        crossAxisSpacing: 10,
+                        mainAxisSpacing: 10,
+                        children: [
+                          buildSensorCard('Temperature', temperature, Icons.thermostat, max: 40),
+                          buildSensorCard('Humidity', humidity, Icons.water_drop, isCritical: humidity < 40, max: 100),
+                          buildSensorCard('Oxygen Levels', oxygen, Icons.air, max: 100),
+                          buildSensorCard('CO₂ Levels', co2, Icons.cloud, max: 100),
+                          buildToggleCard('Egg Turning', eggTurning, (val) {
+                            setState(() {
+                              incubatorData[selectedIncubator]!['eggTurning'] = val;
+                            });
+                          }),
+                          buildToggleCard('Lighting', lighting, (val) {
+                            setState(() {
+                              incubatorData[selectedIncubator]!['lighting'] = val;
+                            });
+                          }),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-                SizedBox(height: 20),
-                Expanded(
-                  child: GridView.count(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 10,
-                    mainAxisSpacing: 10,
-                    children: [
-                      buildSensorCard('Temperature', '${temperature.toStringAsFixed(1)}°C', Icons.thermostat),
-                      buildSensorCard('Humidity', '${humidity.toStringAsFixed(0)}%', Icons.water_drop,
-                          isCritical: humidity < 40),
-                      buildSensorCard('Oxygen Levels', '${oxygen.toStringAsFixed(0)}%', Icons.air),
-                      buildSensorCard('CO₂ Levels', '${co2.toStringAsFixed(0)}%', Icons.cloud),
-                      buildToggleCard('Egg Turning', eggTurning, (val) {
-                        setState(() {
-                          incubatorData[selectedIncubator]!['eggTurning'] = val;
-                        });
-                      }),
-                      buildToggleCard('Lighting', lighting, (val) {
-                        setState(() {
-                          incubatorData[selectedIncubator]!['lighting'] = val;
-                        });
-                      }),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+              ),
+              if (showWarning) buildWarningOverlay(humidity),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget buildSensorCard(String label, double value, IconData icon, {bool isCritical = false, double max = 100}) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.blue[100]!, Colors.blue[50]!],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+      ),
+      padding: const EdgeInsets.all(12.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 40, color: isCritical ? Colors.red : Colors.blue),
+          SizedBox(height: 10),
+          CircularProgressIndicator(
+            value: value / max,
+            color: isCritical ? Colors.red : Colors.blue,
+            strokeWidth: 6,
           ),
-          if (showWarning) buildWarningOverlay(humidity),
+          SizedBox(height: 10),
+          Text(value.toStringAsFixed(1), style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          Text(label, textAlign: TextAlign.center),
         ],
       ),
     );
   }
 
-  Widget buildSensorCard(String label, String value, IconData icon, {bool isCritical = false}) {
-    return Card(
-      color: isCritical ? Colors.red[100] : Colors.lightBlue[50],
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 40, color: isCritical ? Colors.red : Colors.blue),
-            SizedBox(height: 10),
-            Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            Text(label, textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget buildToggleCard(String label, bool isOn, Function(bool) onChanged) {
-    return Card(
-      color: Colors.lightBlue[50],
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              label == 'Egg Turning' ? Icons.sync : Icons.lightbulb,
-              size: 40,
-              color: Colors.blue,
-            ),
-            SizedBox(height: 10),
-            Switch(value: isOn, onChanged: onChanged),
-            Text(label),
-          ],
-        ),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.lightBlue[50],
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+      ),
+      padding: const EdgeInsets.all(12.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            label == 'Egg Turning' ? Icons.sync : Icons.lightbulb,
+            size: 40,
+            color: Colors.blue,
+          ),
+          SizedBox(height: 10),
+          Switch(value: isOn, onChanged: onChanged),
+          Text(label),
+        ],
       ),
     );
   }
