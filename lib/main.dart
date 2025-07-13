@@ -143,6 +143,18 @@ class _DashboardState extends State<Dashboard> {
     });
   }
 
+  void deleteIncubator(String name) {
+    if (incubatorData.length <= 1) return; // Prevent deleting the last incubator
+
+    incubatorData.remove(name);
+
+    setState(() {
+      selectedIncubator = incubatorData.keys.first;
+      showWarning = false;
+      checkHumidityWarning();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     double temperature = incubatorData[selectedIncubator]!['temperature'];
@@ -158,6 +170,32 @@ class _DashboardState extends State<Dashboard> {
         title: Text('Dashboard'),
         backgroundColor: Colors.lightBlue,
         actions: [
+          IconButton(
+            icon: Icon(Icons.delete),
+            tooltip: 'Remove Incubator',
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: Text('Remove $selectedIncubator?'),
+                  content: Text('Are you sure you want to remove this incubator?'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text('Cancel'),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        deleteIncubator(selectedIncubator);
+                      },
+                      child: Text('Remove', style: TextStyle(color: Colors.red)),
+                    )
+                  ],
+                ),
+              );
+            },
+          ),
           IconButton(onPressed: () {}, icon: Icon(Icons.account_circle))
         ],
       ),
