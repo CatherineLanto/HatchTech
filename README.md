@@ -1,16 +1,3 @@
-# hatchtech
+# HatchTech
 
-A new Flutter project.
-
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+HatchTech is a Flutter-based mobile app for monitoring and controlling smart egg incubators. It simulates real-time temperature, humidity, oxygen, and CO₂ levels, with alerts and toggles for lighting and egg turning. Supports multiple incubators with dynamic data.
