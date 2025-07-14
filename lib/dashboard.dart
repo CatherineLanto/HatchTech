@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:hatchtech/screens/profile_screen.dart';
+import 'package:hatchtech/profile_screen.dart';
 import 'dart:async';
 import 'dart:math';
 
@@ -7,6 +7,7 @@ class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
 
   @override
+  // ignore: library_private_types_in_public_api
   _DashboardState createState() => _DashboardState();
 }
 
