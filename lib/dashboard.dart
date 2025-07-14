@@ -13,6 +13,7 @@ class Dashboard extends StatefulWidget {
 
 class _DashboardState extends State<Dashboard> {
   String selectedIncubator = 'Incubator 1';
+
   final Map<String, Map<String, dynamic>> incubatorData = {
     'Incubator 1': {
       'temperature': 37.0,
@@ -55,7 +56,7 @@ class _DashboardState extends State<Dashboard> {
 
   void checkHumidityWarning() {
     double humidity = incubatorData[selectedIncubator]!['humidity'];
-    Timer(Duration(milliseconds: 500), () {
+    Timer(const Duration(milliseconds: 500), () {
       if (humidity < 40.0) {
         setState(() {
           showWarning = true;
@@ -85,14 +86,40 @@ class _DashboardState extends State<Dashboard> {
     });
   }
 
-  void deleteIncubator(String name) {
-    if (incubatorData.length <= 1) return;
-    incubatorData.remove(name);
-    setState(() {
-      selectedIncubator = incubatorData.keys.first;
-      showWarning = false;
-      checkHumidityWarning();
-    });
+  void showRenameDialog(BuildContext context, String incubatorKey) {
+    final TextEditingController controller = TextEditingController(text: incubatorKey);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Rename Incubator'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'New Incubator Name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              String newName = controller.text.trim();
+              if (newName.isNotEmpty && !incubatorData.containsKey(newName)) {
+                setState(() {
+                  incubatorData[newName] = incubatorData.remove(incubatorKey)!;
+                  if (selectedIncubator == incubatorKey) {
+                    selectedIncubator = newName;
+                  }
+                });
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -117,32 +144,6 @@ class _DashboardState extends State<Dashboard> {
         backgroundColor: Colors.lightBlue,
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete),
-            tooltip: 'Remove Incubator',
-            onPressed: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: Text('Remove $selectedIncubator?'),
-                  content: const Text('Are you sure you want to remove this incubator?'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Cancel'),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        deleteIncubator(selectedIncubator);
-                      },
-                      child: const Text('Remove', style: TextStyle(color: Colors.red)),
-                    )
-                  ],
-                ),
-              );
-            },
-          ),
-          IconButton(
             icon: const Icon(Icons.account_circle),
             onPressed: () {
               Navigator.push(
@@ -150,7 +151,7 @@ class _DashboardState extends State<Dashboard> {
                 MaterialPageRoute(builder: (context) => const ProfileScreen()),
               );
             },
-          )
+          ),
         ],
       ),
       body: LayoutBuilder(
@@ -166,28 +167,52 @@ class _DashboardState extends State<Dashboard> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
-                            value: selectedIncubator,
-                            items: incubatorData.keys.map((key) {
-                              return DropdownMenuItem(value: key, child: Text(key));
-                            }).toList(),
-                            onChanged: (value) {
-                              setState(() {
-                                selectedIncubator = value!;
-                                showWarning = false;
-                                checkHumidityWarning();
-                              });
-                            },
-                            decoration: const InputDecoration(
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
+  value: selectedIncubator,
+  items: incubatorData.keys.map((key) {
+    return DropdownMenuItem(
+      value: key,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(key),
+          GestureDetector(
+            onTap: () {
+              Navigator.pop(context); // Close dropdown
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                showRenameDialog(context, key);
+              });
+            },
+            child: const Icon(Icons.edit, size: 18),
+          ),
+        ],
+      ),
+    );
+  }).toList(),
+  selectedItemBuilder: (context) {
+    // This determines what shows in the collapsed dropdown
+    return incubatorData.keys.map((key) {
+      return Text(key); // Only show plain text here
+    }).toList();
+  },
+  onChanged: (value) {
+    if (value != null) {
+      setState(() {
+        selectedIncubator = value;
+        showWarning = false;
+        checkHumidityWarning();
+      });
+    }
+  },
+  decoration: const InputDecoration(
+    border: OutlineInputBorder(),
+  ),
+),
                         ),
                         const SizedBox(width: 10),
                         ElevatedButton.icon(
                           onPressed: addNewIncubator,
                           icon: const Icon(Icons.add),
                           label: const Text('Add'),
-                          
                         ),
                       ],
                     ),
@@ -307,7 +332,6 @@ class _DashboardState extends State<Dashboard> {
                   showWarning = false;
                 });
               },
-              
               child: const Text('Dismiss'),
             ),
           ],
