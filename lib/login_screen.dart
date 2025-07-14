@@ -11,8 +11,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _recoveryController = TextEditingController();
 
-  // Define valid credentials
   final String validUsername = "Hatchtech";
   final String validPassword = "1234";
 
@@ -35,6 +35,84 @@ class _LoginScreenState extends State<LoginScreen> {
         isLoginFailed = true;
       });
     }
+  }
+
+  void _showForgotPasswordDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.lock_reset, size: 48, color: Color.fromARGB(255, 56, 179, 228)),
+                const SizedBox(height: 16),
+                const Text(
+                  'Forgot Password',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Enter your username or email and we’ll send you a reset link.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, color: Colors.black87),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _recoveryController,
+                  decoration: InputDecoration(
+                    prefixIcon: const Icon(Icons.email_outlined),
+                    labelText: 'Username or Email',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pop(context);
+                        _recoveryController.clear();
+                      },
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        String recoveryInput = _recoveryController.text.trim();
+                        Navigator.pop(context);
+                        _recoveryController.clear();
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Reset link sent to "$recoveryInput"')),
+                        );
+                      },
+                      icon: const Icon(Icons.send),
+                      label: const Text('Send Link'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color.fromARGB(255, 76, 164, 247),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -82,9 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           style: TextStyle(color: Colors.red),
                         ),
                         TextButton(
-                          onPressed: () {
-                            // Add forgot password logic if needed
-                          },
+                          onPressed: _showForgotPasswordDialog,
                           child: const Text('Forgot Password?'),
                         ),
                       ],
@@ -92,9 +168,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   : Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
-                        onPressed: () {
-                          // Add forgot password logic if needed
-                        },
+                        onPressed: _showForgotPasswordDialog,
                         child: const Text('Forgot Password?'),
                       ),
                     ),
