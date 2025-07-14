@@ -40,7 +40,7 @@ class _DashboardState extends State<Dashboard> {
   void initState() {
     super.initState();
     checkHumidityWarning();
-    dataUpdateTimer = Timer.periodic(Duration(seconds: 5), (_) => updateSensorData());
+    dataUpdateTimer = Timer.periodic(const Duration(seconds: 5), (_) => updateSensorData());
   }
 
   void updateSensorData() {
@@ -130,6 +130,17 @@ class _DashboardState extends State<Dashboard> {
 
   @override
   Widget build(BuildContext context) {
+    if (!incubatorData.containsKey(selectedIncubator)) {
+      if (incubatorData.isNotEmpty) {
+        selectedIncubator = incubatorData.keys.first;
+      } else {
+        return Scaffold(
+          appBar: AppBar(title: const Text('Dashboard')),
+          body: const Center(child: Text('No incubators available')),
+        );
+      }
+    }
+
     double temperature = incubatorData[selectedIncubator]!['temperature'];
     double humidity = incubatorData[selectedIncubator]!['humidity'];
     double oxygen = incubatorData[selectedIncubator]!['oxygen'];
@@ -145,11 +156,25 @@ class _DashboardState extends State<Dashboard> {
         actions: [
           IconButton(
             icon: const Icon(Icons.account_circle),
-            onPressed: () {
-              Navigator.push(
+            onPressed: () async {
+              bool? updated = await Navigator.push(
                 context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+                MaterialPageRoute(
+                  builder: (context) => ProfileScreen(
+                    incubatorData: incubatorData,
+                    selectedIncubator: selectedIncubator,
+                  ),
+                ),
               );
+
+              if (updated == true) {
+                setState(() {
+                  if (!incubatorData.containsKey(selectedIncubator)) {
+                    selectedIncubator = incubatorData.keys.first;
+                  }
+                  checkHumidityWarning();
+                });
+              }
             },
           ),
         ],
@@ -167,46 +192,43 @@ class _DashboardState extends State<Dashboard> {
                       children: [
                         Expanded(
                           child: DropdownButtonFormField<String>(
-  value: selectedIncubator,
-  items: incubatorData.keys.map((key) {
-    return DropdownMenuItem(
-      value: key,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(key),
-          GestureDetector(
-            onTap: () {
-              Navigator.pop(context); // Close dropdown
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                showRenameDialog(context, key);
-              });
-            },
-            child: const Icon(Icons.edit, size: 18),
-          ),
-        ],
-      ),
-    );
-  }).toList(),
-  selectedItemBuilder: (context) {
-    // This determines what shows in the collapsed dropdown
-    return incubatorData.keys.map((key) {
-      return Text(key); // Only show plain text here
-    }).toList();
-  },
-  onChanged: (value) {
-    if (value != null) {
-      setState(() {
-        selectedIncubator = value;
-        showWarning = false;
-        checkHumidityWarning();
-      });
-    }
-  },
-  decoration: const InputDecoration(
-    border: OutlineInputBorder(),
-  ),
-),
+                            value: selectedIncubator,
+                            items: incubatorData.keys.map((key) {
+                              return DropdownMenuItem(
+                                value: key,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(key),
+                                    GestureDetector(
+                                      onTap: () {
+                                        Navigator.pop(context);
+                                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                                          showRenameDialog(context, key);
+                                        });
+                                      },
+                                      child: const Icon(Icons.edit, size: 18),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            selectedItemBuilder: (context) {
+                              return incubatorData.keys.map((key) => Text(key)).toList();
+                            },
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() {
+                                  selectedIncubator = value;
+                                  showWarning = false;
+                                  checkHumidityWarning();
+                                });
+                              }
+                            },
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 10),
                         ElevatedButton.icon(
@@ -292,11 +314,7 @@ class _DashboardState extends State<Dashboard> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            label == 'Egg Turning' ? Icons.sync : Icons.lightbulb,
-            size: 40,
-            color: Colors.blue,
-          ),
+          Icon(label == 'Egg Turning' ? Icons.sync : Icons.lightbulb, size: 40, color: Colors.blue),
           const SizedBox(height: 10),
           Switch(value: isOn, onChanged: onChanged),
           Text(label),
