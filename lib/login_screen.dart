@@ -1,8 +1,41 @@
 import 'package:flutter/material.dart';
-import 'package:hatchtech/dashboard.dart'; 
+import 'package:hatchtech/dashboard.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  // Define valid credentials
+  final String validUsername = "Hatchtech";
+  final String validPassword = "1234";
+
+  bool isLoginFailed = false;
+
+  void _handleLogin() {
+    final inputUsername = _usernameController.text.trim();
+    final inputPassword = _passwordController.text.trim();
+
+    if (inputUsername == validUsername && inputPassword == validPassword) {
+      setState(() {
+        isLoginFailed = false;
+      });
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const Dashboard()),
+      );
+    } else {
+      setState(() {
+        isLoginFailed = true;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,44 +47,64 @@ class LoginScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.egg, size: 80, color: Colors.orange),
-              SizedBox(height: 20),
-              Text('HatchTech', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              SizedBox(height: 20),
+              const Icon(Icons.egg, size: 80, color: Colors.orange),
+              const SizedBox(height: 20),
+              const Text(
+                'HatchTech',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
               TextField(
-                decoration: InputDecoration(
+                controller: _usernameController,
+                decoration: const InputDecoration(
                   prefixIcon: Icon(Icons.person),
-                  hintText: 'Username',
+                  labelText: 'Username',
                   border: OutlineInputBorder(),
                 ),
               ),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               TextField(
+                controller: _passwordController,
                 obscureText: true,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   prefixIcon: Icon(Icons.lock),
-                  hintText: 'Password',
+                  labelText: 'Password',
                   border: OutlineInputBorder(),
                 ),
               ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {},
-                  child: Text('Forgot Password?'),
-                ),
-              ),
+              const SizedBox(height: 10),
+              isLoginFailed
+                  ? Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Invalid username or password',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            // Add forgot password logic if needed
+                          },
+                          child: const Text('Forgot Password?'),
+                        ),
+                      ],
+                    )
+                  : Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () {
+                          // Add forgot password logic if needed
+                        },
+                        child: const Text('Forgot Password?'),
+                      ),
+                    ),
+              const SizedBox(height: 10),
               ElevatedButton(
-                onPressed: () {
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(builder: (context) => const Dashboard()),
-                  );
-                },
-                child: Text('Log In'),
+                onPressed: _handleLogin,
+                child: const Text('Log In'),
               ),
-              SizedBox(height: 10),
-              Text("Don't have an account? Sign Up"),
+              const SizedBox(height: 10),
+              const Text("Don't have an account? Sign Up"),
             ],
           ),
         ),
