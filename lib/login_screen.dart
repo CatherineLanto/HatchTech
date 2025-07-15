@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hatchtech/dashboard.dart';
+import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -17,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final String validPassword = "1234";
 
   bool isLoginFailed = false;
+  bool obscurePassword = true;
 
   void _handleLogin() {
     final inputUsername = _usernameController.text.trim();
@@ -50,7 +52,7 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.lock_reset, size: 48, color: Color.fromARGB(255, 56, 179, 228)),
+                const Icon(Icons.lock_reset, size: 48, color: Colors.blueAccent),
                 const SizedBox(height: 16),
                 const Text(
                   'Forgot Password',
@@ -98,7 +100,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       icon: const Icon(Icons.send),
                       label: const Text('Send Link'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color.fromARGB(255, 76, 164, 247),
+                        backgroundColor: Colors.blueAccent,
                         foregroundColor: Colors.white,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -115,70 +117,127 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  InputDecoration _inputDecoration(String label, IconData icon) {
+    return InputDecoration(
+      labelText: label,
+      prefixIcon: Icon(icon),
+      filled: true,
+      fillColor: Colors.grey.shade100,
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.blueAccent),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final width = MediaQuery.of(context).size.width;
+
     return Scaffold(
-      backgroundColor: Colors.lightBlue[100],
+      backgroundColor: const Color(0xFFEAF1FA),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.egg, size: 80, color: Colors.orange),
-              const SizedBox(height: 20),
               const Text(
-                'HatchTech',
-                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: _usernameController,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.person),
-                  labelText: 'Username',
-                  border: OutlineInputBorder(),
+                "HatchTech",
+                style: TextStyle(
+                  fontSize: 32,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blueAccent,
                 ),
               ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.lock),
-                  labelText: 'Password',
-                  border: OutlineInputBorder(),
+              const SizedBox(height: 30),
+              Container(
+                width: width < 480 ? double.infinity : 420,
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 12)],
                 ),
-              ),
-              const SizedBox(height: 10),
-              isLoginFailed
-                  ? Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _usernameController,
+                      decoration: _inputDecoration("Username", Icons.person),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: obscurePassword,
+                      decoration: _inputDecoration("Password", Icons.lock).copyWith(
+                        suffixIcon: IconButton(
+                          icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (isLoginFailed)
+                      const Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
                           'Invalid username or password',
                           style: TextStyle(color: Colors.red),
                         ),
-                        TextButton(
-                          onPressed: _showForgotPasswordDialog,
-                          child: const Text('Forgot Password?'),
-                        ),
-                      ],
-                    )
-                  : Align(
+                      ),
+                    Align(
                       alignment: Alignment.centerRight,
                       child: TextButton(
                         onPressed: _showForgotPasswordDialog,
                         child: const Text('Forgot Password?'),
                       ),
                     ),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: _handleLogin,
-                child: const Text('Log In'),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: _handleLogin,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blueAccent,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text("Log In", style: TextStyle(fontSize: 16)),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text("Don't have an account? "),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (_) => const SignUpScreen()),
+                            );
+                          },
+                          child: const Text(
+                            "Sign Up",
+                            style: TextStyle(
+                              color: Colors.blueAccent,
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        )
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 10),
-              const Text("Don't have an account? Sign Up"),
             ],
           ),
         ),

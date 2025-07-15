@@ -1,3 +1,4 @@
+// Same imports
 import 'package:flutter/material.dart';
 import 'package:hatchtech/profile_screen.dart';
 import 'dart:async';
@@ -7,7 +8,6 @@ class Dashboard extends StatefulWidget {
   const Dashboard({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
   _DashboardState createState() => _DashboardState();
 }
 
@@ -141,18 +141,19 @@ class _DashboardState extends State<Dashboard> {
       }
     }
 
-    double temperature = incubatorData[selectedIncubator]!['temperature'];
-    double humidity = incubatorData[selectedIncubator]!['humidity'];
-    double oxygen = incubatorData[selectedIncubator]!['oxygen'];
-    double co2 = incubatorData[selectedIncubator]!['co2'];
-    bool eggTurning = incubatorData[selectedIncubator]!['eggTurning'];
-    bool lighting = incubatorData[selectedIncubator]!['lighting'];
+    final selectedData = incubatorData[selectedIncubator]!;
+    final temperature = selectedData['temperature'];
+    final humidity = selectedData['humidity'];
+    final oxygen = selectedData['oxygen'];
+    final co2 = selectedData['co2'];
+    final eggTurning = selectedData['eggTurning'];
+    final lighting = selectedData['lighting'];
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Dashboard'),
-        backgroundColor: Colors.lightBlue,
+        backgroundColor: Colors.blueAccent,
         actions: [
           IconButton(
             icon: const Icon(Icons.account_circle),
@@ -185,7 +186,7 @@ class _DashboardState extends State<Dashboard> {
           return Stack(
             children: [
               Padding(
-                padding: const EdgeInsets.all(16.0),
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
                     Row(
@@ -200,14 +201,14 @@ class _DashboardState extends State<Dashboard> {
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(key),
-                                    GestureDetector(
-                                      onTap: () {
-                                        Navigator.pop(context);
+                                    IconButton(
+                                      icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
+                                      onPressed: () {
+                                        Navigator.pop(context); 
                                         WidgetsBinding.instance.addPostFrameCallback((_) {
                                           showRenameDialog(context, key);
                                         });
                                       },
-                                      child: const Icon(Icons.edit, size: 18),
                                     ),
                                   ],
                                 ),
@@ -235,6 +236,10 @@ class _DashboardState extends State<Dashboard> {
                           onPressed: addNewIncubator,
                           icon: const Icon(Icons.add),
                           label: const Text('Add'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueAccent,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
                         ),
                       ],
                     ),
@@ -242,8 +247,8 @@ class _DashboardState extends State<Dashboard> {
                     Expanded(
                       child: GridView.count(
                         crossAxisCount: crossAxisCount,
-                        crossAxisSpacing: 10,
-                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 12,
+                        mainAxisSpacing: 12,
                         children: [
                           buildSensorCard('Temperature', temperature, Icons.thermostat, max: 40),
                           buildSensorCard('Humidity', humidity, Icons.water_drop, isCritical: humidity < 40, max: 100),
@@ -273,18 +278,19 @@ class _DashboardState extends State<Dashboard> {
     );
   }
 
-  Widget buildSensorCard(String label, double value, IconData icon, {bool isCritical = false, double max = 100}) {
+  Widget buildSensorCard(String label, double value, IconData icon,
+      {bool isCritical = false, double max = 100}) {
     return Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.blue[100]!, Colors.blue[50]!],
+          colors: [Colors.blue[100]!, Colors.white],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
       ),
-      padding: const EdgeInsets.all(12.0),
+      padding: const EdgeInsets.all(12),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -307,10 +313,10 @@ class _DashboardState extends State<Dashboard> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.lightBlue[50],
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [BoxShadow(color: Colors.black26, blurRadius: 4)],
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
       ),
-      padding: const EdgeInsets.all(12.0),
+      padding: const EdgeInsets.all(12),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
