@@ -62,6 +62,12 @@ class ProfileScreen extends StatelessWidget {
                         builder: (_) => IncubatorManager(
                           incubatorData: incubatorData,
                           onDelete: (name) {
+                            if (incubatorData.length <= 1) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text("At least one incubator must remain.")),
+                              );
+                              return;
+                            }
                             incubatorData.remove(name);
                             Navigator.pop(context); // Close bottom sheet
                             Navigator.pop(context, true); // Notify Dashboard
@@ -133,7 +139,7 @@ class IncubatorManager extends StatelessWidget {
               final name = incubatorData.keys.elementAt(index);
               return ListTile(
                 title: Text(name),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                trailing: const Icon(Icons.delete_outline, size: 20, color: Colors.blueAccent),
                 onTap: () {
                   showDialog(
                     context: context,
@@ -149,7 +155,7 @@ class IncubatorManager extends StatelessWidget {
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
                           onPressed: () {
                             onDelete(name);
-                            Navigator.pop(ctx); // Close dialog
+                            Navigator.pop(ctx); // Close alert dialog
                           },
                           child: const Text('Delete'),
                         ),
