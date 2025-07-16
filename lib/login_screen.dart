@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:hatchtech/dashboard.dart';
+import 'package:hatchtech/main.dart';
+import 'overview_screen.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, required this.themeNotifier});
+
+  final ValueNotifier<ThemeMode> themeNotifier;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -30,7 +33,12 @@ class _LoginScreenState extends State<LoginScreen> {
       });
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const Dashboard()),
+        MaterialPageRoute(
+          builder: (context) => OverviewPage(
+            userName: inputUsername,
+            themeNotifier: widget.themeNotifier,
+          ),
+        ),
       );
     } else {
       setState(() {
@@ -62,7 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const Text(
                   'Enter your username or email and we’ll send you a reset link.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Colors.black87),
+                  style: TextStyle(fontSize: 14),
                 ),
                 const SizedBox(height: 16),
                 TextField(
@@ -122,16 +130,8 @@ class _LoginScreenState extends State<LoginScreen> {
       labelText: label,
       prefixIcon: Icon(icon),
       filled: true,
-      fillColor: Colors.grey.shade100,
+      fillColor: Theme.of(context).inputDecorationTheme.fillColor,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.blueAccent),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: Colors.grey.shade300),
-      ),
     );
   }
 
@@ -140,7 +140,6 @@ class _LoginScreenState extends State<LoginScreen> {
     final width = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFEAF1FA),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -160,7 +159,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 width: width < 480 ? double.infinity : 420,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 12)],
                 ),
@@ -221,7 +220,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           onTap: () {
                             Navigator.pushReplacement(
                               context,
-                              MaterialPageRoute(builder: (_) => const SignUpScreen()),
+                              MaterialPageRoute(
+                                builder: (_) => SignUpScreen(themeNotifier: themeNotifier),
+                              ),
                             );
                           },
                           child: const Text(

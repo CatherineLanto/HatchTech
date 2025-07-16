@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:hatchtech/main.dart';
 import 'login_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
-  const SignUpScreen({super.key});
+  final ValueNotifier<ThemeMode> themeNotifier;
+
+  const SignUpScreen({super.key, required this.themeNotifier});
 
   @override
   State<SignUpScreen> createState() => _SignUpScreenState();
@@ -31,7 +34,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(
+        builder: (_) => LoginScreen(themeNotifier: themeNotifier),
+      ),
     );
   }
 
@@ -40,7 +45,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
       labelText: label,
       prefixIcon: Icon(icon),
       filled: true,
-      fillColor: Colors.grey.shade100,
+      fillColor: Theme.of(context).inputDecorationTheme.fillColor,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
@@ -58,7 +63,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final width = MediaQuery.of(context).size.width;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFEAF1FA),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -67,16 +72,16 @@ class _SignUpScreenState extends State<SignUpScreen> {
             children: [
               const Icon(Icons.person_add_alt_1_rounded, size: 80, color: Colors.blueAccent),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 "Create Account",
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: Colors.black87),
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 24),
               Container(
                 width: width < 480 ? double.infinity : 420,
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Theme.of(context).cardColor,
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 12)],
                 ),
@@ -140,7 +145,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           onTap: () {
                             Navigator.pushReplacement(
                               context,
-                              MaterialPageRoute(builder: (_) => const LoginScreen()),
+                              MaterialPageRoute(
+                                builder: (_) => LoginScreen(themeNotifier: widget.themeNotifier),
+                              ),
                             );
                           },
                           child: const Text(

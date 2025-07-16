@@ -4,19 +4,35 @@ import 'package:hatchtech/login_screen.dart';
 class ProfileScreen extends StatelessWidget {
   final Map<String, Map<String, dynamic>> incubatorData;
   final String selectedIncubator;
+  final ValueNotifier<ThemeMode> themeNotifier;
 
   const ProfileScreen({
     super.key,
     required this.incubatorData,
     required this.selectedIncubator,
+    required this.themeNotifier,
   });
 
   @override
   Widget build(BuildContext context) {
+    bool isDark = themeNotifier.value == ThemeMode.dark;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Profile'),
         backgroundColor: Colors.blueAccent,
+        actions: [
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.dark_mode : Icons.light_mode,
+              color: Colors.white,
+            ),
+            onPressed: () {
+              themeNotifier.value =
+                  isDark ? ThemeMode.light : ThemeMode.dark;
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -94,7 +110,9 @@ class ProfileScreen extends StatelessWidget {
                 onPressed: () {
                   Navigator.pushAndRemoveUntil(
                     context,
-                    MaterialPageRoute(builder: (_) => const LoginScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => LoginScreen(themeNotifier: themeNotifier),
+                    ),
                     (route) => false,
                   );
                 },

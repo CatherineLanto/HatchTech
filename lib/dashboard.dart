@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:hatchtech/main.dart';
 import 'dart:async';
 import 'dart:math';
-import 'package:hatchtech/profile_screen.dart';
+import 'profile_screen.dart';
 
 class Dashboard extends StatefulWidget {
-  const Dashboard({super.key});
+  final String incubatorName;
+  final String userName;
+  final ValueNotifier<ThemeMode> themeNotifier;
+  const Dashboard({super.key, required this.incubatorName, required this.userName, required this.themeNotifier});
 
   @override
   State<Dashboard> createState() => _DashboardState();
@@ -163,6 +167,7 @@ class _DashboardState extends State<Dashboard> {
                   builder: (_) => ProfileScreen(
                     incubatorData: incubatorData,
                     selectedIncubator: selectedIncubator,
+                    themeNotifier: themeNotifier,
                   ),
                 ),
               );
@@ -292,9 +297,14 @@ class _DashboardState extends State<Dashboard> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+        boxShadow: [
+          BoxShadow(
+            color: Theme.of(context).shadowColor.withAlpha(50),
+            blurRadius: 4,
+          )
+        ],
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -302,9 +312,16 @@ class _DashboardState extends State<Dashboard> {
         children: [
           Icon(icon, size: 40, color: barColor),
           const SizedBox(height: 10),
-          CircularProgressIndicator(value: percentage.clamp(0.0, 1.0), color: barColor, strokeWidth: 6),
+          CircularProgressIndicator(
+            value: percentage.clamp(0.0, 1.0),
+            color: barColor,
+            strokeWidth: 6,
+          ),
           const SizedBox(height: 10),
-          Text(value.toStringAsFixed(1), style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+          Text(
+            value.toStringAsFixed(1),
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
           Text(label),
         ],
       ),
@@ -317,9 +334,14 @@ class _DashboardState extends State<Dashboard> {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 4)],
+        boxShadow: [
+          BoxShadow(
+           color: Theme.of(context).shadowColor.withAlpha(50),
+            blurRadius: 4,
+          ),
+        ],
       ),
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -340,7 +362,7 @@ class _DashboardState extends State<Dashboard> {
         margin: const EdgeInsets.all(30),
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: Theme.of(context).cardColor,
           border: Border.all(color: Colors.red, width: 2),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -349,7 +371,11 @@ class _DashboardState extends State<Dashboard> {
           children: [
             const Icon(Icons.warning, color: Colors.red, size: 40),
             const SizedBox(height: 10),
-            Text(warningMessage, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+            Text(
+              warningMessage,
+              style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
             const SizedBox(height: 10),
             ElevatedButton(
               onPressed: () {
