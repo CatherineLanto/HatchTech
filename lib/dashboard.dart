@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hatchtech/main.dart';
 import 'dart:async';
 import 'dart:math';
 import 'profile_screen.dart';
@@ -200,7 +199,8 @@ class _DashboardState extends State<Dashboard> {
                   builder: (_) => ProfileScreen(
                     incubatorData: incubatorData,
                     selectedIncubator: selectedIncubator,
-                    themeNotifier: themeNotifier,
+                    themeNotifier: widget.themeNotifier,
+                    userName: widget.userName,
                   ),
                 ),
               );

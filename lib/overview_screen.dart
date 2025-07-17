@@ -84,6 +84,7 @@ class _OverviewPageState extends State<OverviewPage> {
                     incubatorData: incubatorData,
                     selectedIncubator: incubators.isNotEmpty ? incubators.first : '',
                     themeNotifier: widget.themeNotifier,
+                    userName: widget.userName,
                   ),
                 ),
               );

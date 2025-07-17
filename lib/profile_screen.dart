@@ -5,12 +5,14 @@ class ProfileScreen extends StatelessWidget {
   final Map<String, Map<String, dynamic>> incubatorData;
   final String selectedIncubator;
   final ValueNotifier<ThemeMode> themeNotifier;
+  final String userName;
 
   const ProfileScreen({
     super.key,
     required this.incubatorData,
     required this.selectedIncubator,
     required this.themeNotifier,
+    required this.userName,
   });
 
   @override
@@ -44,14 +46,14 @@ class ProfileScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Admin User',
+              userName,
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
             const SizedBox(height: 6),
             Text(
-              'HatchTech Administrator',
+              'HatchTech User',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 30),
@@ -62,7 +64,7 @@ class ProfileScreen extends StatelessWidget {
                   ListTile(
                     leading: const Icon(Icons.email_outlined, color: Colors.blueAccent),
                     title: const Text('Email'),
-                    subtitle: const Text('admin@hatchtech.com'),
+                    subtitle: Text('${userName.toLowerCase().replaceAll(' ', '')}@hatchtech.com'),
                   ),
                   const Divider(height: 0),
                   ListTile(

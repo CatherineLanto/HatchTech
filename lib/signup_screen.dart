@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:hatchtech/main.dart';
 import 'login_screen.dart';
+import 'overview_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   final ValueNotifier<ThemeMode> themeNotifier;
@@ -21,6 +21,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool obscureConfirm = true;
 
   void _signUp() {
+    // Check if all fields are filled
+    if (_username.text.trim().isEmpty || 
+        _email.text.trim().isEmpty || 
+        _password.text.trim().isEmpty || 
+        _confirmPassword.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill in all fields")),
+      );
+      return;
+    }
+
+    // Check if passwords match
     if (_password.text != _confirmPassword.text) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Passwords do not match")),
@@ -28,14 +40,26 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
+    // Basic email validation
+    if (!_email.text.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a valid email address")),
+      );
+      return;
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Account Created!")),
+      const SnackBar(content: Text("Account Created! Welcome to HatchTech!")),
     );
 
+    // Navigate directly to overview page with the new user's username
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (_) => LoginScreen(themeNotifier: themeNotifier),
+        builder: (_) => OverviewPage(
+          userName: _username.text.trim(),
+          themeNotifier: widget.themeNotifier,
+        ),
       ),
     );
   }
