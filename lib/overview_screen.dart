@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dashboard.dart';
+import 'profile_screen.dart';
 
 class OverviewPage extends StatelessWidget {
   final String userName;
@@ -23,12 +24,21 @@ class OverviewPage extends StatelessWidget {
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("Overview"),
-        backgroundColor: Colors.blue[700],
+        backgroundColor: Colors.blueAccent,
         actions: [
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () {
-              Navigator.pushNamed(context, '/profile');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProfileScreen(
+                    incubatorData: const {}, // Empty data for now
+                    selectedIncubator: incubators.isNotEmpty ? incubators.first : '',
+                    themeNotifier: themeNotifier,
+                  ),
+                ),
+              );
             },
           ),
         ],
