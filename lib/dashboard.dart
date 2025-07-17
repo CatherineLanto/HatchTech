@@ -8,7 +8,17 @@ class Dashboard extends StatefulWidget {
   final String incubatorName;
   final String userName;
   final ValueNotifier<ThemeMode> themeNotifier;
-  const Dashboard({super.key, required this.incubatorName, required this.userName, required this.themeNotifier});
+  final Map<String, Map<String, dynamic>>? incubatorData;
+  final Function(Map<String, Map<String, dynamic>>)? onDataChanged;
+  
+  const Dashboard({
+    super.key, 
+    required this.incubatorName, 
+    required this.userName, 
+    required this.themeNotifier,
+    this.incubatorData,
+    this.onDataChanged,
+  });
 
   @override
   State<Dashboard> createState() => _DashboardState();
@@ -24,14 +34,23 @@ class _DashboardState extends State<Dashboard> {
   bool isDropdownOpen = false;
   FocusNode dropdownFocusNode = FocusNode();
 
-  final Map<String, Map<String, dynamic>> incubatorData = {
-    'Incubator 1': {'temperature': 37.0, 'humidity': 35.0, 'oxygen': 20.0, 'co2': 800.0, 'eggTurning': true, 'lighting': true},
-    'Incubator 2': {'temperature': 38.2, 'humidity': 60.0, 'oxygen': 19.5, 'co2': 900.0, 'eggTurning': false, 'lighting': false},
-  };
+  final Map<String, Map<String, dynamic>> incubatorData = {};
 
   @override
   void initState() {
     super.initState();
+    
+    // Initialize with passed data or default data
+    if (widget.incubatorData != null && widget.incubatorData!.isNotEmpty) {
+      incubatorData.addAll(widget.incubatorData!);
+    } else {
+      incubatorData.addAll({
+        'Incubator 1': {'temperature': 37.0, 'humidity': 35.0, 'oxygen': 20.0, 'co2': 800.0, 'eggTurning': true, 'lighting': true},
+        'Incubator 2': {'temperature': 38.2, 'humidity': 60.0, 'oxygen': 19.5, 'co2': 900.0, 'eggTurning': false, 'lighting': false},
+      });
+    }
+    
+    selectedIncubator = widget.incubatorName;
     dataUpdateTimer = Timer.periodic(const Duration(seconds: 4), (_) => updateSensorData());
   }
 
@@ -77,6 +96,12 @@ class _DashboardState extends State<Dashboard> {
     }
   }
 
+  void _notifyDataChanged() {
+    if (widget.onDataChanged != null) {
+      widget.onDataChanged!(Map.from(incubatorData));
+    }
+  }
+
   void addNewIncubator() {
     int count = incubatorData.length + 1;
     String newName = 'Incubator $count';
@@ -92,6 +117,7 @@ class _DashboardState extends State<Dashboard> {
       selectedIncubator = newName;
     });
     checkAlerts();
+    _notifyDataChanged(); // Notify parent about the change
   }
 
   void showRenameDialog(BuildContext context, String incubatorKey) {
@@ -120,6 +146,7 @@ class _DashboardState extends State<Dashboard> {
                   selectedIncubator = newName;
                 }
               });
+              _notifyDataChanged(); // Notify parent about the change
               Navigator.pop(context);
             }
           },
@@ -128,7 +155,7 @@ class _DashboardState extends State<Dashboard> {
       ],
     ),
   );
-}
+  }
 
 
   @override
@@ -153,7 +180,13 @@ class _DashboardState extends State<Dashboard> {
 
     final selected = incubatorData[selectedIncubator]!;
 
-    return Scaffold(
+    return PopScope(
+      onPopInvoked: (didPop) {
+        if (didPop) {
+          _notifyDataChanged();
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard'),
         backgroundColor: Colors.blueAccent,
@@ -283,6 +316,7 @@ class _DashboardState extends State<Dashboard> {
           if (showWarning) buildWarningDialog(),
         ],
       ),
+    )
     );
   }
 
