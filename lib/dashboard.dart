@@ -180,7 +180,7 @@ class _DashboardState extends State<Dashboard> {
     final selected = incubatorData[selectedIncubator]!;
 
     return PopScope(
-      onPopInvoked: (didPop) {
+      onPopInvokedWithResult: (didPop, result) {
         if (didPop) {
           _notifyDataChanged();
         }
