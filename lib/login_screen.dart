@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'overview_screen.dart';
 import 'signup_screen.dart';
 
@@ -49,7 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  void _handleLogin() {
+  void _handleLogin() async {
     final inputUsername = _usernameController.text.trim();
     final inputPassword = _passwordController.text.trim();
 
@@ -66,11 +67,26 @@ class _LoginScreenState extends State<LoginScreen> {
         isLoginFailed = false;
         errorMessage = null;
       });
+
+      // Load user-specific data from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final userKey = inputUsername.toLowerCase().replaceAll(' ', '');
+      final savedUsername = prefs.getString('user_name_$userKey') ?? inputUsername;
+      
+      // Save the original login username for this specific user (only if not already saved)
+      if (!prefs.containsKey('original_login_name_$userKey')) {
+        await prefs.setString('original_login_name_$userKey', inputUsername);
+      }
+      
+      // Set current user identifier for other screens to use
+      await prefs.setString('current_user', userKey);
+
       Navigator.pushReplacement(
+        // ignore: use_build_context_synchronously
         context,
         MaterialPageRoute(
           builder: (context) => OverviewPage(
-            userName: inputUsername,
+            userName: savedUsername,
             themeNotifier: widget.themeNotifier,
           ),
         ),

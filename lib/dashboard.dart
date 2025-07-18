@@ -9,6 +9,7 @@ class Dashboard extends StatefulWidget {
   final ValueNotifier<ThemeMode> themeNotifier;
   final Map<String, Map<String, dynamic>>? incubatorData;
   final Function(Map<String, Map<String, dynamic>>)? onDataChanged;
+  final Function(String)? onUserNameChanged;
   
   const Dashboard({
     super.key, 
@@ -17,6 +18,7 @@ class Dashboard extends StatefulWidget {
     required this.themeNotifier,
     this.incubatorData,
     this.onDataChanged,
+    this.onUserNameChanged,
   });
 
   @override
@@ -32,12 +34,15 @@ class _DashboardState extends State<Dashboard> {
   final Duration alertCooldown = const Duration(seconds: 10);
   bool isDropdownOpen = false;
   FocusNode dropdownFocusNode = FocusNode();
+  late String currentUserName;
 
   final Map<String, Map<String, dynamic>> incubatorData = {};
 
   @override
   void initState() {
     super.initState();
+    
+    currentUserName = widget.userName;
     
     if (widget.incubatorData != null && widget.incubatorData!.isNotEmpty) {
       incubatorData.addAll(widget.incubatorData!);
@@ -216,25 +221,42 @@ class _DashboardState extends State<Dashboard> {
           IconButton(
             icon: const Icon(Icons.account_circle),
             onPressed: () async {
-              bool? updated = await Navigator.push(
+              final result = await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (_) => ProfileScreen(
                     incubatorData: incubatorData,
                     selectedIncubator: selectedIncubator,
                     themeNotifier: widget.themeNotifier,
-                    userName: widget.userName,
+                    userName: currentUserName,
                   ),
                 ),
               );
 
-              if (updated == true) {
+              // Handle both username changes (String) and incubator changes (bool)
+              if (result != null) {
+                // Handle username change
+                if (result is String && result.isNotEmpty && result != currentUserName) {
+                  setState(() {
+                    currentUserName = result;
+                  });
+                  // Notify overview of username change
+                  if (widget.onUserNameChanged != null) {
+                    widget.onUserNameChanged!(result);
+                  }
+                }
+                
                 setState(() {
                   if (!incubatorData.containsKey(selectedIncubator)) {
                     selectedIncubator = incubatorData.keys.first;
                   }
                   checkAlerts();
                 });
+                
+                // Update data callback if result indicates changes
+                if (widget.onDataChanged != null) {
+                  widget.onDataChanged!(Map.from(incubatorData));
+                }
               }
             },
           ),
@@ -269,7 +291,6 @@ class _DashboardState extends State<Dashboard> {
                                   IconButton(
                                     icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
                                     onPressed: () {
-                                      Navigator.pop(context); 
                                       WidgetsBinding.instance.addPostFrameCallback((_) {
                                         showRenameDialog(context, key);
                                       });

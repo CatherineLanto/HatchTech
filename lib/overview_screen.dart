@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'dashboard.dart';
 import 'profile_screen.dart';
 
@@ -50,8 +52,7 @@ class _OverviewPageState extends State<OverviewPage> {
   void initState() {
     super.initState();
     userName = widget.userName;
-    _updateCounts();
-    // No timer needed - overview gets data from dashboard
+    _loadUserData();
   }
 
   @override
@@ -70,6 +71,8 @@ class _OverviewPageState extends State<OverviewPage> {
         incubators = newData.keys.toList();
         _updateCounts();
       });
+      // Auto-save data after update
+      _saveUserData();
     }
   }
 
@@ -113,6 +116,54 @@ class _OverviewPageState extends State<OverviewPage> {
     });
   }
 
+  // Load user data from SharedPreferences
+  Future<void> _loadUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentUser = prefs.getString('current_user') ?? '';
+    
+    if (currentUser.isNotEmpty) {
+      // Load saved username
+      final savedUsername = prefs.getString('user_name_$currentUser');
+      if (savedUsername != null) {
+        setState(() {
+          userName = savedUsername;
+        });
+      }
+      
+      // Load saved incubator data
+      final savedData = prefs.getString('incubator_data_$currentUser');
+      if (savedData != null) {
+        try {
+          final Map<String, dynamic> decoded = json.decode(savedData);
+          setState(() {
+            incubatorData = decoded.map((key, value) => 
+              MapEntry(key, Map<String, dynamic>.from(value)));
+            incubators = incubatorData.keys.toList();
+          });
+        } catch (e) {
+          // Handle JSON decode error gracefully
+          // Optionally log or show an error message
+        }
+      }
+    }
+    _updateCounts();
+  }
+
+  // Save user data to SharedPreferences
+  Future<void> _saveUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentUser = prefs.getString('current_user') ?? '';
+    
+    if (currentUser.isNotEmpty) {
+      // Save username
+      await prefs.setString('user_name_$currentUser', userName);
+      
+      // Save incubator data
+      final dataToSave = json.encode(incubatorData);
+      await prefs.setString('incubator_data_$currentUser', dataToSave);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -150,6 +201,8 @@ class _OverviewPageState extends State<OverviewPage> {
                 setState(() {
                   userName = result;
                 });
+                // Save username change
+                _saveUserData();
               }
             },
           ),
@@ -230,6 +283,12 @@ class _OverviewPageState extends State<OverviewPage> {
                                   themeNotifier: widget.themeNotifier,
                                   incubatorData: incubatorData,
                                   onDataChanged: updateIncubatorData,
+                                  onUserNameChanged: (newUserName) {
+                                    setState(() {
+                                      userName = newUserName;
+                                    });
+                                    _saveUserData();
+                                  },
                                 ),
                               ),
                             );
@@ -286,7 +345,7 @@ class _OverviewPageState extends State<OverviewPage> {
                           ),
                         ),
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ),
@@ -323,6 +382,12 @@ class _OverviewPageState extends State<OverviewPage> {
                           themeNotifier: widget.themeNotifier,
                           incubatorData: incubatorData,
                           onDataChanged: updateIncubatorData,
+                          onUserNameChanged: (newUserName) {
+                            setState(() {
+                              userName = newUserName;
+                            });
+                            _saveUserData();
+                          },
                         ),
                       ),
                     );
@@ -440,6 +505,12 @@ class _OverviewPageState extends State<OverviewPage> {
                           themeNotifier: widget.themeNotifier,
                           incubatorData: incubatorData,
                           onDataChanged: updateIncubatorData,
+                          onUserNameChanged: (newUserName) {
+                            setState(() {
+                              userName = newUserName;
+                            });
+                            _saveUserData();
+                          },
                         ),
                       ),
                     );

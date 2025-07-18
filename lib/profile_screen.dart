@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hatchtech/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -43,6 +44,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         title: const Text('Profile'),
         backgroundColor: Colors.blueAccent,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () async {
+            // Auto-save and return username if changed
+            await _saveUserData();
+            // ignore: use_build_context_synchronously
+            Navigator.pop(context, _nameController.text.trim());
+          },
+        ),
         actions: [
           IconButton(
             icon: Icon(
@@ -149,7 +159,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             }
                             widget.incubatorData.remove(name);
                             Navigator.pop(context); 
-                            Navigator.pop(context, true); 
+                            Navigator.pop(context, _nameController.text.trim()); 
                           },
                         ),
                       );
@@ -161,55 +171,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 30),
 
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.save),
-                    label: const Text('Save Changes'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.pop(context, _nameController.text.trim());
-                    },
+            // Just logout button - no save button needed since changes auto-save
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.logout),
+                label: const Text('Log Out'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.logout),
-                    label: const Text('Log Out'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blueAccent,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onPressed: () {
-                      Navigator.pushAndRemoveUntil(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => LoginScreen(
-                            themeNotifier: widget.themeNotifier,
-                          ),
+                onPressed: () async {
+                  // Auto-save any username changes before logging out
+                  await _saveUserData();
+                  
+                  // Clear current user session
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.remove('current_user');
+                  
+                  if (mounted) {
+                    Navigator.pushAndRemoveUntil(
+                      // ignore: use_build_context_synchronously
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => LoginScreen(
+                          themeNotifier: widget.themeNotifier,
                         ),
-                        (route) => false,
-                      );
-                    },
-                  ),
-                ),
-              ],
+                      ),
+                      (route) => false,
+                    );
+                  }
+                },
+              ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  // Auto-save user data when changes are made
+  Future<void> _saveUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentUser = prefs.getString('current_user') ?? '';
+    
+    if (currentUser.isNotEmpty) {
+      // Save username if it was changed
+      final newUsername = _nameController.text.trim();
+      if (newUsername.isNotEmpty) {
+        await prefs.setString('user_name_$currentUser', newUsername);
+      }
+    }
   }
 }
 
