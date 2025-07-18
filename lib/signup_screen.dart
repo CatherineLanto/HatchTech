@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'login_screen.dart';
 import 'overview_screen.dart';
 
@@ -103,8 +104,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
+                    onPressed: () async {
+                      // Save user data with current user system
+                      final prefs = await SharedPreferences.getInstance();
+                      final userKey = _username.text.trim().toLowerCase().replaceAll(' ', '');
+                      
+                      // Set current user identifier for the system
+                      await prefs.setString('current_user', userKey);
+                      
+                      // Save the original login username and current username
+                      await prefs.setString('original_login_name_$userKey', _username.text.trim());
+                      await prefs.setString('user_name_$userKey', _username.text.trim());
+                      
+                      // ignore: use_build_context_synchronously
                       Navigator.pop(context); 
+                      // ignore: use_build_context_synchronously
                       Navigator.pushReplacement(
                         context,
                         MaterialPageRoute(

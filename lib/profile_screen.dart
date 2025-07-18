@@ -23,11 +23,33 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _nameController;
   bool _isEditing = false;
+  String originalLoginName = '';
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.userName);
+    _loadOriginalLoginName();
+  }
+
+  Future<void> _loadOriginalLoginName() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Get the current user key from the system
+    final currentUser = prefs.getString('current_user') ?? '';
+    
+    if (currentUser.isNotEmpty) {
+      final original = prefs.getString('original_login_name_$currentUser');
+      setState(() {
+        originalLoginName = original ?? widget.userName;
+      });
+    } else {
+      // Fallback: if no current_user, use the username as key (for backward compatibility)
+      final userKey = widget.userName.toLowerCase().replaceAll(' ', '');
+      final original = prefs.getString('original_login_name_$userKey');
+      setState(() {
+        originalLoginName = original ?? widget.userName;
+      });
+    }
   }
 
   @override
@@ -113,7 +135,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 6),
             Text(
-              'HatchTech User',
+              originalLoginName.isNotEmpty ? originalLoginName : widget.userName,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 30),
@@ -129,7 +151,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: Colors.blueAccent),
                     title: const Text('Email'),
                     subtitle: Text(
-                      '${_nameController.text.toLowerCase().replaceAll(' ', '')}@hatchtech.com',
+                      '${originalLoginName.isNotEmpty ? originalLoginName.toLowerCase().replaceAll(' ', '') : _nameController.text.toLowerCase().replaceAll(' ', '')}@hatchtech.com',
                     ),
                   ),
                   const Divider(height: 0),
