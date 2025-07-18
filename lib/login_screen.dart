@@ -12,7 +12,7 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _recoveryController = TextEditingController();
@@ -23,11 +23,40 @@ class _LoginScreenState extends State<LoginScreen> {
   bool isLoginFailed = false;
   bool obscurePassword = true;
   String? errorMessage;
+  
+  late AnimationController _animationController;
+  late List<Animation<double>> _animations;
 
   @override
   void initState() {
     super.initState();
     _usernameController.addListener(_clearError);
+    
+    // Initialize staggered animations
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 1200),
+      vsync: this,
+    );
+    
+    _animations = List.generate(4, (index) {
+      return Tween<double>(begin: 0.0, end: 1.0).animate(
+        CurvedAnimation(
+          parent: _animationController,
+          curve: Interval(
+            index * 0.15,
+            (index * 0.15) + 0.6,
+            curve: Curves.easeOutCubic,
+          ),
+        ),
+      );
+    });
+    
+    // Start animations after a brief delay
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) {
+        _animationController.forward();
+      }
+    });
     _passwordController.addListener(_clearError);
   }
 
@@ -38,6 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
     _usernameController.dispose();
     _passwordController.dispose();
     _recoveryController.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -84,11 +114,26 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.pushReplacement(
         // ignore: use_build_context_synchronously
         context,
-        MaterialPageRoute(
-          builder: (context) => OverviewPage(
+        PageRouteBuilder(
+          pageBuilder: (context, animation, secondaryAnimation) => OverviewPage(
             userName: savedUsername,
             themeNotifier: widget.themeNotifier,
           ),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.0, 0.3),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeOutCubic,
+                )),
+                child: child,
+              ),
+            );
+          },
         ),
       );
     } else {
@@ -361,97 +406,183 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text(
-                "HatchTech",
-                style: TextStyle(
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.blueAccent,
+              SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.0, -0.5),
+                  end: Offset.zero,
+                ).animate(_animations[0]),
+                child: FadeTransition(
+                  opacity: _animations[0],
+                  child: const Text(
+                    "HatchTech",
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.blueAccent,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 30),
-              Container(
-                width: width < 480 ? double.infinity : 420,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 12)],
-                ),
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: _usernameController,
-                      decoration: _inputDecoration("Username", Icons.person, context),
+              SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.0, 0.3),
+                  end: Offset.zero,
+                ).animate(_animations[1]),
+                child: FadeTransition(
+                  opacity: _animations[1],
+                  child: Container(
+                    width: width < 480 ? double.infinity : 420,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 12)],
                     ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _passwordController,
-                      obscureText: obscurePassword,
-                      decoration: _inputDecoration("Password", Icons.lock, context).copyWith(
-                        suffixIcon: IconButton(
-                          icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
-                          onPressed: () => setState(() => obscurePassword = !obscurePassword),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    if (isLoginFailed && errorMessage != null)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          errorMessage!,
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton(
-                        onPressed: _showForgotPasswordDialog,
-                        child: const Text('Forgot Password?'),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _handleLogin,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text("Log In", style: TextStyle(fontSize: 16)),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: Column(
                       children: [
-                        const Text("Don't have an account? "),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => SignUpScreen(themeNotifier: widget.themeNotifier),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            "Sign Up",
-                            style: TextStyle(
-                              color: Colors.blueAccent,
-                              fontWeight: FontWeight.bold,
-                              decoration: TextDecoration.underline,
+                        SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(-0.3, 0.0),
+                            end: Offset.zero,
+                          ).animate(_animations[2]),
+                          child: FadeTransition(
+                            opacity: _animations[2],
+                            child: TextField(
+                              controller: _usernameController,
+                              decoration: _inputDecoration("Username", Icons.person, context),
                             ),
                           ),
-                        )
+                        ),
+                        const SizedBox(height: 16),
+                        SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.3, 0.0),
+                            end: Offset.zero,
+                          ).animate(_animations[2]),
+                          child: FadeTransition(
+                            opacity: _animations[2],
+                            child: TextField(
+                              controller: _passwordController,
+                              obscureText: obscurePassword,
+                              decoration: _inputDecoration("Password", Icons.lock, context).copyWith(
+                                suffixIcon: IconButton(
+                                  icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
+                                  onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        if (isLoginFailed && errorMessage != null)
+                          SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0.0, 0.3),
+                              end: Offset.zero,
+                            ).animate(_animations[3]),
+                            child: FadeTransition(
+                              opacity: _animations[3],
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  errorMessage!,
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              ),
+                            ),
+                          ),
+                        SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.3, 0.0),
+                            end: Offset.zero,
+                          ).animate(_animations[3]),
+                          child: FadeTransition(
+                            opacity: _animations[3],
+                            child: Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton(
+                                onPressed: _showForgotPasswordDialog,
+                                child: const Text('Forgot Password?'),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.0, 0.5),
+                            end: Offset.zero,
+                          ).animate(_animations[3]),
+                          child: FadeTransition(
+                            opacity: _animations[3],
+                            child: SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton(
+                                onPressed: _handleLogin,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blueAccent,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text("Log In", style: TextStyle(fontSize: 16)),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.0, 0.3),
+                            end: Offset.zero,
+                          ).animate(_animations[3]),
+                          child: FadeTransition(
+                            opacity: _animations[3],
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text("Don't have an account? "),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.pushReplacement(
+                                      context,
+                                      PageRouteBuilder(
+                                        pageBuilder: (context, animation, secondaryAnimation) => 
+                                          SignUpScreen(themeNotifier: widget.themeNotifier),
+                                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                          const begin = Offset(1.0, 0.0);
+                                          const end = Offset.zero;
+                                          const curve = Curves.easeInOutCubic;
+                                          var tween = Tween(begin: begin, end: end).chain(
+                                            CurveTween(curve: curve),
+                                          );
+                                          return SlideTransition(
+                                            position: animation.drive(tween),
+                                            child: child,
+                                          );
+                                        },
+                                        transitionDuration: const Duration(milliseconds: 300),
+                                      ),
+                                    );
+                                  },
+                                  child: const Text(
+                                    "Sign Up",
+                                    style: TextStyle(
+                                      color: Colors.blueAccent,
+                                      fontWeight: FontWeight.bold,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ],

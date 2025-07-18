@@ -25,16 +25,19 @@ class Dashboard extends StatefulWidget {
   State<Dashboard> createState() => _DashboardState();
 }
 
-class _DashboardState extends State<Dashboard> {
+class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   String selectedIncubator = 'Incubator 1';
   bool showWarning = false;
-  String warningMessage = '';
+  List<Map<String, dynamic>> currentAlerts = [];
   late Timer dataUpdateTimer;
+  Timer? _autoDismissTimer;
   DateTime? lastAlertTime;
-  final Duration alertCooldown = const Duration(seconds: 10);
+  final Duration alertCooldown = const Duration(seconds: 20);
   bool isDropdownOpen = false;
   FocusNode dropdownFocusNode = FocusNode();
   late String currentUserName;
+  late AnimationController _warningAnimationController;
+  late Animation<double> _warningAnimation;
 
   final Map<String, Map<String, dynamic>> incubatorData = {};
 
@@ -43,6 +46,16 @@ class _DashboardState extends State<Dashboard> {
     super.initState();
     
     currentUserName = widget.userName;
+    
+    // Initialize animation controller
+    _warningAnimationController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _warningAnimation = CurvedAnimation(
+      parent: _warningAnimationController,
+      curve: Curves.elasticOut,
+    );
     
     if (widget.incubatorData != null && widget.incubatorData!.isNotEmpty) {
       incubatorData.addAll(widget.incubatorData!);
@@ -95,31 +108,94 @@ class _DashboardState extends State<Dashboard> {
     final now = DateTime.now();
     if (lastAlertTime != null && now.difference(lastAlertTime!) < alertCooldown) return;
 
-    List<String> alerts = [];
+    List<Map<String, dynamic>> alerts = [];
 
+    // Only check incubators that are NOT currently selected to avoid redundancy
     incubatorData.forEach((key, values) {
-      // Use same thresholds as overview for consistency
-      if (values['humidity'] < 35 || values['humidity'] > 65) {
-        alerts.add('$key: Humidity out of range (${values['humidity'].toStringAsFixed(1)}%)');
-      }
+      if (key == selectedIncubator) return; // Skip current incubator
+      
+      // Critical alerts (red)
       if (values['temperature'] < 36 || values['temperature'] > 39) {
-        alerts.add('$key: Temperature out of range (${values['temperature'].toStringAsFixed(1)}°C)');
+        alerts.add({
+          'incubator': key,
+          'type': 'Temperature',
+          'message': 'Temperature out of range (${values['temperature'].toStringAsFixed(1)}°C)',
+          'severity': 'critical',
+          'value': values['temperature'],
+          'unit': '°C',
+          'icon': Icons.thermostat,
+        });
       }
       if (values['oxygen'] < 19) {
-        alerts.add('$key: Low Oxygen (${values['oxygen'].toStringAsFixed(1)}%)');
+        alerts.add({
+          'incubator': key,
+          'type': 'Oxygen',
+          'message': 'Low Oxygen (${values['oxygen'].toStringAsFixed(1)}%)',
+          'severity': 'critical',
+          'value': values['oxygen'],
+          'unit': '%',
+          'icon': Icons.air,
+        });
+      }
+      
+      // Warning alerts (orange/yellow)
+      if (values['humidity'] < 35 || values['humidity'] > 65) {
+        alerts.add({
+          'incubator': key,
+          'type': 'Humidity',
+          'message': 'Humidity out of range (${values['humidity'].toStringAsFixed(1)}%)',
+          'severity': 'warning',
+          'value': values['humidity'],
+          'unit': '%',
+          'icon': Icons.water_drop,
+        });
       }
       if (values['co2'] > 900) {
-        alerts.add('$key: High CO₂ (${values['co2'].toStringAsFixed(0)} ppm)');
+        alerts.add({
+          'incubator': key,
+          'type': 'CO₂',
+          'message': 'High CO₂ (${values['co2'].toStringAsFixed(0)} ppm)',
+          'severity': 'warning',
+          'value': values['co2'],
+          'unit': ' ppm',
+          'icon': Icons.cloud,
+        });
       }
     });
 
     if (alerts.isNotEmpty) {
       setState(() {
-        warningMessage = alerts[Random().nextInt(alerts.length)];
+        currentAlerts = alerts;
         showWarning = true;
         lastAlertTime = now;
       });
+      _warningAnimationController.forward();
+      
+      // Auto-dismiss after 15 seconds for non-critical alerts
+      final hasCriticalAlert = alerts.any((alert) => alert['severity'] == 'critical');
+      if (!hasCriticalAlert) {
+        _autoDismissTimer?.cancel();
+        _autoDismissTimer = Timer(const Duration(seconds: 15), () {
+          if (mounted && showWarning) {
+            _dismissWarning();
+          }
+        });
+      }
+    } else if (showWarning) {
+      _dismissWarning();
     }
+  }
+
+  void _dismissWarning() {
+    _autoDismissTimer?.cancel();
+    _warningAnimationController.reverse().then((_) {
+      if (mounted) {
+        setState(() {
+          showWarning = false;
+          currentAlerts.clear();
+        });
+      }
+    });
   }
 
   void _notifyDataChanged() {
@@ -189,6 +265,8 @@ class _DashboardState extends State<Dashboard> {
   void dispose() {
     dropdownFocusNode.dispose();
     dataUpdateTimer.cancel();
+    _autoDismissTimer?.cancel();
+    _warningAnimationController.dispose();
     super.dispose();
   }
 
@@ -357,7 +435,13 @@ class _DashboardState extends State<Dashboard> {
               ],
             ),
           ),
-          if (showWarning) buildWarningDialog(),
+          if (showWarning) 
+            Positioned(
+              top: 80,
+              left: 0,
+              right: 0,
+              child: buildWarningDialog(),
+            ),
         ],
       ),
     )
@@ -374,7 +458,9 @@ class _DashboardState extends State<Dashboard> {
         ? Colors.red
         : Colors.blue;
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -389,19 +475,45 @@ class _DashboardState extends State<Dashboard> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 40, color: barColor),
-          const SizedBox(height: 10),
-          CircularProgressIndicator(
-            value: percentage.clamp(0.0, 1.0),
-            color: barColor,
-            strokeWidth: 6,
+          TweenAnimationBuilder<Color?>(
+            duration: const Duration(milliseconds: 500),
+            tween: ColorTween(begin: Colors.grey, end: barColor),
+            builder: (context, color, child) {
+              return Icon(icon, size: 40, color: color);
+            },
           ),
           const SizedBox(height: 10),
-          Text(
-            value.toStringAsFixed(1),
-            style: Theme.of(context).textTheme.titleLarge,
+          TweenAnimationBuilder<double>(
+            duration: const Duration(milliseconds: 800),
+            tween: Tween(begin: 0.0, end: percentage.clamp(0.0, 1.0)),
+            curve: Curves.easeOutCubic,
+            builder: (context, animatedValue, child) {
+              return CircularProgressIndicator(
+                value: animatedValue,
+                color: barColor,
+                strokeWidth: 6,
+              );
+            },
           ),
-          Text(label),
+          const SizedBox(height: 10),
+          TweenAnimationBuilder<double>(
+            duration: const Duration(milliseconds: 600),
+            tween: Tween(begin: 0.0, end: value),
+            curve: Curves.easeOutCubic,
+            builder: (context, animatedValue, child) {
+              return Text(
+                animatedValue.toStringAsFixed(1),
+                style: Theme.of(context).textTheme.titleLarge,
+              );
+            },
+          ),
+          AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 300),
+            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+              color: barColor.withOpacity(0.8),
+            ),
+            child: Text(label),
+          ),
         ],
       ),
     );
@@ -411,7 +523,9 @@ class _DashboardState extends State<Dashboard> {
     IconData icon = label == 'Lighting' ? Icons.lightbulb : Icons.sync;
     Color iconColor = isOn ? Colors.green : Colors.grey;
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(16),
@@ -426,45 +540,218 @@ class _DashboardState extends State<Dashboard> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 40, color: iconColor),
+          TweenAnimationBuilder<Color?>(
+            duration: const Duration(milliseconds: 400),
+            tween: ColorTween(begin: Colors.grey, end: iconColor),
+            builder: (context, color, child) {
+              return AnimatedRotation(
+                duration: const Duration(milliseconds: 300),
+                turns: isOn ? 0.0 : 0.25,
+                child: Icon(icon, size: 40, color: color),
+              );
+            },
+          ),
           const SizedBox(height: 10),
-          Switch(value: isOn, onChanged: onChanged),
-          Text(label),
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            child: Switch(
+              key: ValueKey(isOn),
+              value: isOn,
+              onChanged: onChanged,
+              activeColor: Colors.green,
+            ),
+          ),
+          AnimatedDefaultTextStyle(
+            duration: const Duration(milliseconds: 300),
+            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+              color: iconColor.withOpacity(0.8),
+            ),
+            child: Text(label),
+          ),
         ],
       ),
     );
   }
 
   Widget buildWarningDialog() {
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.all(30),
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
-          border: Border.all(color: Colors.red, width: 2),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.warning, color: Colors.red, size: 40),
-            const SizedBox(height: 10),
-            Text(
-              warningMessage,
-              style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.center,
+    return AnimatedBuilder(
+      animation: _warningAnimation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _warningAnimation.value,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            constraints: const BoxConstraints(maxHeight: 400),
+            child: Material(
+              elevation: 8,
+              borderRadius: BorderRadius.circular(16),
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Colors.red.shade50,
+                      Colors.orange.shade50,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.red.shade300, width: 2),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade100,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, 
+                               color: Colors.red.shade700, size: 28),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              currentAlerts.length == 1 
+                                  ? 'Alert from Other Incubator'
+                                  : 'Alerts from Other Incubators',
+                              style: TextStyle(
+                                color: Colors.red.shade700,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '${currentAlerts.length}',
+                            style: TextStyle(
+                              color: Colors.red.shade700,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Alerts List
+                    Flexible(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.all(12),
+                        itemCount: currentAlerts.length,
+                        separatorBuilder: (context, index) => const Divider(height: 1),
+                        itemBuilder: (context, index) {
+                          final alert = currentAlerts[index];
+                          final isCritical = alert['severity'] == 'critical';
+                          
+                          return Container(
+                            padding: const EdgeInsets.all(12),
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            decoration: BoxDecoration(
+                              color: isCritical 
+                                  ? Colors.red.shade100 
+                                  : Colors.orange.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isCritical 
+                                    ? Colors.red.shade300 
+                                    : Colors.orange.shade300,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  alert['icon'],
+                                  color: isCritical 
+                                      ? Colors.red.shade700 
+                                      : Colors.orange.shade700,
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        alert['incubator'],
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 14,
+                                          color: isCritical 
+                                              ? Colors.red.shade700 
+                                              : Colors.orange.shade700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        alert['message'],
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey.shade700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: isCritical 
+                                        ? Colors.red.shade200 
+                                        : Colors.orange.shade200,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Text(
+                                    isCritical ? 'CRITICAL' : 'WARNING',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: isCritical 
+                                          ? Colors.red.shade700 
+                                          : Colors.orange.shade700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    
+                    // Action Button
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            _dismissWarning();
+                          },
+                          icon: const Icon(Icons.close, size: 18),
+                          label: const Text('Dismiss'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.red.shade600,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: () {
-                setState(() => showWarning = false);
-              },
-              child: const Text('Dismiss'),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 }

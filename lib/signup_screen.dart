@@ -12,7 +12,7 @@ class SignUpScreen extends StatefulWidget {
   State<SignUpScreen> createState() => _SignUpScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
+class _SignUpScreenState extends State<SignUpScreen> with TickerProviderStateMixin {
   final _username = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
@@ -24,17 +24,44 @@ class _SignUpScreenState extends State<SignUpScreen> {
   String? errorMessage;
   bool hasError = false;
 
+  late AnimationController _animationController;
+  late List<Animation<double>> _animations;
+
   @override
   void initState() {
     super.initState();
+    
+    // Initialize animations
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 1400),
+      vsync: this,
+    );
+    
+    _animations = List.generate(5, (index) {
+      return Tween<double>(begin: 0.0, end: 1.0).animate(
+        CurvedAnimation(
+          parent: _animationController,
+          curve: Interval(
+            index * 0.2,
+            (index * 0.2) + 0.3,
+            curve: Curves.easeOutCubic,
+          ),
+        ),
+      );
+    });
+    
     _username.addListener(_clearError);
     _email.addListener(_clearError);
     _password.addListener(_clearError);
     _confirmPassword.addListener(_clearError);
+    
+    // Start animations
+    _animationController.forward();
   }
 
   @override
   void dispose() {
+    _animationController.dispose();
     _username.removeListener(_clearError);
     _email.removeListener(_clearError);
     _password.removeListener(_clearError);
@@ -120,6 +147,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       Navigator.pop(context); 
                       // ignore: use_build_context_synchronously
                       Navigator.pushReplacement(
+                        // ignore: use_build_context_synchronously
                         context,
                         MaterialPageRoute(
                           builder: (_) => OverviewPage(
@@ -217,108 +245,212 @@ class _SignUpScreenState extends State<SignUpScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.person_add_alt_1_rounded, size: 80, color: Colors.blueAccent),
+              SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.0, -0.5),
+                  end: Offset.zero,
+                ).animate(_animations[0]),
+                child: FadeTransition(
+                  opacity: _animations[0],
+                  child: const Icon(Icons.person_add_alt_1_rounded, size: 80, color: Colors.blueAccent),
+                ),
+              ),
               const SizedBox(height: 16),
-              Text(
-                "Create Account",
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+              SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.0, -0.3),
+                  end: Offset.zero,
+                ).animate(_animations[0]),
+                child: FadeTransition(
+                  opacity: _animations[0],
+                  child: Text(
+                    "Create Account",
+                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
               ),
               const SizedBox(height: 24),
-              Container(
-                width: width < 480 ? double.infinity : 420,
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).cardColor,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 12)],
-                ),
-                child: Column(
-                  children: [
-                    TextField(
-                      controller: _username,
-                      decoration: _inputDecoration("Username", Icons.person),
+              SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.0, 0.3),
+                  end: Offset.zero,
+                ).animate(_animations[1]),
+                child: FadeTransition(
+                  opacity: _animations[1],
+                  child: Container(
+                    width: width < 480 ? double.infinity : 420,
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).cardColor,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 12)],
                     ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _email,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: _inputDecoration("Email", Icons.email),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _password,
-                      obscureText: obscurePassword,
-                      decoration: _inputDecoration("Password", Icons.lock).copyWith(
-                        suffixIcon: IconButton(
-                          icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
-                          onPressed: () => setState(() => obscurePassword = !obscurePassword),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextField(
-                      controller: _confirmPassword,
-                      obscureText: obscureConfirm,
-                      decoration: _inputDecoration("Confirm Password", Icons.lock_outline).copyWith(
-                        suffixIcon: IconButton(
-                          icon: Icon(obscureConfirm ? Icons.visibility_off : Icons.visibility),
-                          onPressed: () => setState(() => obscureConfirm = !obscureConfirm),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    if (hasError && errorMessage != null)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          errorMessage!,
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                      ),
-                    if (hasError && errorMessage != null)
-                      const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _signUp,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
-                          foregroundColor: Colors.white,
-                          textStyle: const TextStyle(fontSize: 16),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text("Sign Up"),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                    child: Column(
                       children: [
-                        const Text("Already have an account? "),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.pushReplacement(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => LoginScreen(themeNotifier: widget.themeNotifier),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            "Log In",
-                            style: TextStyle(
-                              color: Colors.blueAccent,
-                              fontWeight: FontWeight.bold,
-                              decoration: TextDecoration.underline,
+                        SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(-0.3, 0.0),
+                            end: Offset.zero,
+                          ).animate(_animations[2]),
+                          child: FadeTransition(
+                            opacity: _animations[2],
+                            child: TextField(
+                              controller: _username,
+                              decoration: _inputDecoration("Username", Icons.person),
                             ),
                           ),
-                        )
+                        ),
+                        const SizedBox(height: 16),
+                        SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.3, 0.0),
+                            end: Offset.zero,
+                          ).animate(_animations[2]),
+                          child: FadeTransition(
+                            opacity: _animations[2],
+                            child: TextField(
+                              controller: _email,
+                              keyboardType: TextInputType.emailAddress,
+                              decoration: _inputDecoration("Email", Icons.email),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(-0.3, 0.0),
+                            end: Offset.zero,
+                          ).animate(_animations[3]),
+                          child: FadeTransition(
+                            opacity: _animations[3],
+                            child: TextField(
+                              controller: _password,
+                              obscureText: obscurePassword,
+                              decoration: _inputDecoration("Password", Icons.lock).copyWith(
+                                suffixIcon: IconButton(
+                                  icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
+                                  onPressed: () => setState(() => obscurePassword = !obscurePassword),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.3, 0.0),
+                            end: Offset.zero,
+                          ).animate(_animations[3]),
+                          child: FadeTransition(
+                            opacity: _animations[3],
+                            child: TextField(
+                              controller: _confirmPassword,
+                              obscureText: obscureConfirm,
+                              decoration: _inputDecoration("Confirm Password", Icons.lock_outline).copyWith(
+                                suffixIcon: IconButton(
+                                  icon: Icon(obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                                  onPressed: () => setState(() => obscureConfirm = !obscureConfirm),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        if (hasError && errorMessage != null)
+                          SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0.0, 0.3),
+                              end: Offset.zero,
+                            ).animate(_animations[4]),
+                            child: FadeTransition(
+                              opacity: _animations[4],
+                              child: Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  errorMessage!,
+                                  style: const TextStyle(color: Colors.red),
+                                ),
+                              ),
+                            ),
+                          ),
+                        if (hasError && errorMessage != null)
+                          const SizedBox(height: 16),
+                        SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.0, 0.5),
+                            end: Offset.zero,
+                          ).animate(_animations[4]),
+                          child: FadeTransition(
+                            opacity: _animations[4],
+                            child: SizedBox(
+                              width: double.infinity,
+                              height: 50,
+                              child: ElevatedButton(
+                                onPressed: _signUp,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blueAccent,
+                                  foregroundColor: Colors.white,
+                                  textStyle: const TextStyle(fontSize: 16),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Text("Sign Up"),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.0, 0.3),
+                            end: Offset.zero,
+                          ).animate(_animations[4]),
+                          child: FadeTransition(
+                            opacity: _animations[4],
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text("Already have an account? "),
+                                GestureDetector(
+                                  onTap: () {
+                                    Navigator.pushReplacement(
+                                      context,
+                                      PageRouteBuilder(
+                                        pageBuilder: (context, animation, secondaryAnimation) => 
+                                          LoginScreen(themeNotifier: widget.themeNotifier),
+                                        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                          const begin = Offset(-1.0, 0.0);
+                                          const end = Offset.zero;
+                                          const curve = Curves.easeInOutCubic;
+                                          var tween = Tween(begin: begin, end: end).chain(
+                                            CurveTween(curve: curve),
+                                          );
+                                          return SlideTransition(
+                                            position: animation.drive(tween),
+                                            child: child,
+                                          );
+                                        },
+                                        transitionDuration: const Duration(milliseconds: 300),
+                                      ),
+                                    );
+                                  },
+                                  child: const Text(
+                                    "Log In",
+                                    style: TextStyle(
+                                      color: Colors.blueAccent,
+                                      fontWeight: FontWeight.bold,
+                                      decoration: TextDecoration.underline,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             ],

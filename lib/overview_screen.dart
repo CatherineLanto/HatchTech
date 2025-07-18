@@ -268,79 +268,97 @@ class _OverviewPageState extends State<OverviewPage> {
                     const SizedBox(height: 12),
                     const Divider(),
                     const SizedBox(height: 8),
-                    ...normalIncubators.map((name) {
+                    ...normalIncubators.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final name = entry.value;
                       return Padding(
                         padding: const EdgeInsets.symmetric(vertical: 4.0),
-                        child: GestureDetector(
-                          onTap: () async {
-                            // Navigate directly to this incubator's dashboard
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => Dashboard(
-                                  incubatorName: name,
-                                  userName: userName,
-                                  themeNotifier: widget.themeNotifier,
-                                  incubatorData: incubatorData,
-                                  onDataChanged: updateIncubatorData,
-                                  onUserNameChanged: (newUserName) {
-                                    setState(() {
-                                      userName = newUserName;
-                                    });
-                                    _saveUserData();
+                        child: AnimatedContainer(
+                          duration: Duration(milliseconds: 300 + (index * 100)),
+                          curve: Curves.easeOutBack,
+                          child: GestureDetector(
+                            onTap: () async {
+                              // Navigate directly to this incubator's dashboard
+                              await Navigator.push(
+                                context,
+                                PageRouteBuilder(
+                                  pageBuilder: (context, animation, secondaryAnimation) => Dashboard(
+                                    incubatorName: name,
+                                    userName: userName,
+                                    themeNotifier: widget.themeNotifier,
+                                    incubatorData: incubatorData,
+                                    onDataChanged: updateIncubatorData,
+                                    onUserNameChanged: (newUserName) {
+                                      setState(() {
+                                        userName = newUserName;
+                                      });
+                                      _saveUserData();
+                                    },
+                                  ),
+                                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                                    return SlideTransition(
+                                      position: Tween<Offset>(
+                                        begin: const Offset(1.0, 0.0),
+                                        end: Offset.zero,
+                                      ).animate(CurvedAnimation(
+                                        parent: animation,
+                                        curve: Curves.easeInOut,
+                                      )),
+                                      child: child,
+                                    );
                                   },
                                 ),
-                              ),
-                            );
-                            
-                            // Update counts when returning from dashboard
-                            if (mounted) {
-                              _updateCounts();
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(12.0),
-                            decoration: BoxDecoration(
-                              color: Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: Colors.green.shade200,
-                                width: 1,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.check_circle_outline,
-                                  color: Colors.green,
-                                  size: 20,
+                              );
+                              
+                              // Update counts when returning from dashboard
+                              if (mounted) {
+                                _updateCounts();
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(12.0),
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: Colors.green.shade200,
+                                  width: 1,
                                 ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    name,
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.green.shade700,
-                                      fontSize: 15,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.check_circle_outline,
+                                    color: Colors.green,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      name,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green.shade700,
+                                        fontSize: 15,
+                                      ),
                                     ),
                                   ),
-                                ),
-                                Text(
-                                  "All systems normal",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.green.shade600,
-                                    fontStyle: FontStyle.italic,
+                                  Text(
+                                    "All systems normal",
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.green.shade600,
+                                      fontStyle: FontStyle.italic,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                Icon(
-                                  Icons.arrow_forward_ios,
-                                  color: Colors.green.shade400,
-                                  size: 16,
-                                ),
-                              ],
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                    Icons.arrow_forward_ios,
+                                    color: Colors.green.shade400,
+                                    size: 16,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
