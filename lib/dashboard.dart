@@ -544,11 +544,16 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
             duration: const Duration(milliseconds: 400),
             tween: ColorTween(begin: Colors.grey, end: iconColor),
             builder: (context, color, child) {
-              return AnimatedRotation(
-                duration: const Duration(milliseconds: 300),
-                turns: isOn ? 0.0 : 0.25,
-                child: Icon(icon, size: 40, color: color),
-              );
+              // Only add rotation animation for sync icon (Egg Turning), not lightbulb
+              if (label == 'Egg Turning') {
+                return AnimatedRotation(
+                  duration: const Duration(milliseconds: 300),
+                  turns: isOn ? 0.0 : 0.25,
+                  child: Icon(icon, size: 40, color: color),
+                );
+              } else {
+                return Icon(icon, size: 40, color: color);
+              }
             },
           ),
           const SizedBox(height: 10),
