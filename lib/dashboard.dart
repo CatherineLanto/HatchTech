@@ -42,26 +42,48 @@ class _DashboardState extends State<Dashboard> {
     if (widget.incubatorData != null && widget.incubatorData!.isNotEmpty) {
       incubatorData.addAll(widget.incubatorData!);
     } else {
+      // Set better default values within optimal ranges
       incubatorData.addAll({
-        'Incubator 1': {'temperature': 37.0, 'humidity': 35.0, 'oxygen': 20.0, 'co2': 800.0, 'eggTurning': true, 'lighting': true},
-        'Incubator 2': {'temperature': 38.2, 'humidity': 60.0, 'oxygen': 19.5, 'co2': 900.0, 'eggTurning': false, 'lighting': false},
+        'Incubator 1': {'temperature': 37.5, 'humidity': 50.0, 'oxygen': 20.5, 'co2': 800.0, 'eggTurning': true, 'lighting': true},
+        'Incubator 2': {'temperature': 37.8, 'humidity': 55.0, 'oxygen': 20.0, 'co2': 750.0, 'eggTurning': false, 'lighting': false},
       });
     }
     
     selectedIncubator = widget.incubatorName;
-    dataUpdateTimer = Timer.periodic(const Duration(seconds: 4), (_) => updateSensorData());
+    // Reasonable update frequency for good user experience
+    dataUpdateTimer = Timer.periodic(const Duration(seconds: 2), (_) => updateSensorData());
   }
 
   void updateSensorData() {
     setState(() {
       incubatorData.forEach((key, values) {
-        values['temperature'] += (Random().nextDouble() - 0.5);
-        values['humidity'] += (Random().nextDouble() - 0.5);
-        values['oxygen'] += (Random().nextDouble() - 0.3);
-        values['co2'] += (Random().nextDouble() * 10 - 5);
+        // More realistic simulation ranges that occasionally cross thresholds
+        values['temperature'] = _clampValue(
+          values['temperature'] + (Random().nextDouble() - 0.5) * 0.8, // Smaller temperature changes
+          35.0, 40.0 // Realistic range
+        );
+        values['humidity'] = _clampValue(
+          values['humidity'] + (Random().nextDouble() - 0.5) * 6.0, // Moderate humidity changes
+          30.0, 70.0 // Range that sometimes goes out of 35-65% optimal
+        );
+        values['oxygen'] = _clampValue(
+          values['oxygen'] + (Random().nextDouble() - 0.5) * 1.0, // Small oxygen variation
+          18.0, 22.0 // Range that occasionally drops below 19%
+        );
+        values['co2'] = _clampValue(
+          values['co2'] + (Random().nextDouble() - 0.5) * 100, // Moderate CO2 swings
+          600.0, 1100.0 // Range that sometimes crosses 900 threshold
+        );
       });
       checkAlerts();
     });
+    
+    // Immediately notify overview of data changes for real-time synchronization
+    _notifyDataChanged();
+  }
+
+  double _clampValue(double value, double min, double max) {
+    return value.clamp(min, max);
   }
 
   void checkAlerts() {
@@ -71,16 +93,17 @@ class _DashboardState extends State<Dashboard> {
     List<String> alerts = [];
 
     incubatorData.forEach((key, values) {
-      if (values['humidity'] < 40) {
-        alerts.add('$key: Low Humidity (${values['humidity'].toStringAsFixed(1)}%)');
+      // Use same thresholds as overview for consistency
+      if (values['humidity'] < 35 || values['humidity'] > 65) {
+        alerts.add('$key: Humidity out of range (${values['humidity'].toStringAsFixed(1)}%)');
       }
-      if (values['temperature'] < 36.5 || values['temperature'] > 38.5) {
-        alerts.add('$key: Abnormal Temp (${values['temperature'].toStringAsFixed(1)}°C)');
+      if (values['temperature'] < 36 || values['temperature'] > 39) {
+        alerts.add('$key: Temperature out of range (${values['temperature'].toStringAsFixed(1)}°C)');
       }
-      if (values['oxygen'] < 18.0) {
+      if (values['oxygen'] < 19) {
         alerts.add('$key: Low Oxygen (${values['oxygen'].toStringAsFixed(1)}%)');
       }
-      if (values['co2'] > 1000) {
+      if (values['co2'] > 900) {
         alerts.add('$key: High CO₂ (${values['co2'].toStringAsFixed(0)} ppm)');
       }
     });
@@ -115,6 +138,7 @@ class _DashboardState extends State<Dashboard> {
       selectedIncubator = newName;
     });
     checkAlerts();
+    // Immediately notify overview of new incubator
     _notifyDataChanged();
   }
 
@@ -321,10 +345,11 @@ class _DashboardState extends State<Dashboard> {
 
   Widget buildSensorCard(String label, double value, IconData icon, {double max = 100}) {
     double percentage = value / max;
-    Color barColor = (label == 'Humidity' && value < 40) ||
-            (label == 'Temperature' && (value < 36.5 || value > 38.5)) ||
-            (label == 'Oxygen' && value < 18.0) ||
-            (label == 'CO₂' && value > 1000)
+    // Use same thresholds as overview for consistent status display
+    Color barColor = (label == 'Humidity' && (value < 35 || value > 65)) ||
+            (label == 'Temperature' && (value < 36 || value > 39)) ||
+            (label == 'Oxygen' && value < 19.0) ||
+            (label == 'CO₂' && value > 900)
         ? Colors.red
         : Colors.blue;
 

@@ -21,21 +21,22 @@ class _OverviewPageState extends State<OverviewPage> {
   int normalCount = 0;
   int warningCount = 0;
   List<String> incubators = ['Incubator 1', 'Incubator 2'];
+  // Remove independent timer - overview will get data from dashboard
 
   Map<String, Map<String, dynamic>> incubatorData = {
     'Incubator 1': {
-      'temperature': 37.0,
-      'humidity': 35.0,
-      'oxygen': 20.0,
-      'co2': 800.0,
+      'temperature': 37.5, // Optimal range
+      'humidity': 50.0,    // Well within 35-65% range
+      'oxygen': 20.5,      // Above 19% threshold
+      'co2': 800.0,        // Below 900 threshold
       'eggTurning': true,
       'lighting': true
     },
     'Incubator 2': {
-      'temperature': 38.2,
-      'humidity': 60.0,
-      'oxygen': 17.5,
-      'co2': 1100.0,
+      'temperature': 37.8, // Optimal range
+      'humidity': 55.0,    // Well within 35-65% range  
+      'oxygen': 20.0,      // Above 19% threshold
+      'co2': 750.0,        // Well below 900 threshold
       'eggTurning': false,
       'lighting': false
     },
@@ -50,12 +51,22 @@ class _OverviewPageState extends State<OverviewPage> {
     super.initState();
     userName = widget.userName;
     _updateCounts();
+    // No timer needed - overview gets data from dashboard
   }
+
+  @override
+  void dispose() {
+    // No timer to dispose
+    super.dispose();
+  }
+
+  // Remove simulation - overview just displays data from dashboard
 
   void updateIncubatorData(Map<String, Map<String, dynamic>> newData) {
     if (mounted) {
       setState(() {
-        incubatorData = newData;
+        // Simply update with dashboard data - no simulation needed
+        incubatorData = Map.from(newData);
         incubators = newData.keys.toList();
         _updateCounts();
       });
@@ -72,16 +83,17 @@ class _OverviewPageState extends State<OverviewPage> {
     incubatorData.forEach((name, values) {
       List<String> issues = [];
 
-      if (values['humidity'] < 30 || values['humidity'] > 70) {
+      // More sensitive thresholds for more dynamic status changes
+      if (values['humidity'] < 35 || values['humidity'] > 65) {
         issues.add("Humidity out of range");
       }
-      if (values['temperature'] < 35 || values['temperature'] > 40) {
+      if (values['temperature'] < 36 || values['temperature'] > 39) {
         issues.add("Temperature out of range");
       }
-      if (values['oxygen'] < 18) {
+      if (values['oxygen'] < 19) {
         issues.add("Low oxygen level");
       }
-      if (values['co2'] > 1000) {
+      if (values['co2'] > 900) { // Lower threshold for more frequent warnings
         issues.add("High CO₂ level");
       }
 
@@ -125,16 +137,18 @@ class _OverviewPageState extends State<OverviewPage> {
                 ),
               );
 
+              // Always update incubator list and counts when returning from profile
+              // since incubators might have been added, deleted, or renamed
+              setState(() {
+                // Force a complete refresh of the incubator list
+                incubators = List<String>.from(incubatorData.keys);
+                _updateCounts();
+              });
+              
+              // Handle username change separately
               if (result is String && result.isNotEmpty) {
                 setState(() {
                   userName = result;
-                });
-              }
-
-              if (result == true || result is String) {
-                setState(() {
-                  incubators = incubatorData.keys.toList();
-                  _updateCounts();
                 });
               }
             },
@@ -153,24 +167,133 @@ class _OverviewPageState extends State<OverviewPage> {
           ),
           const SizedBox(height: 20),
 
-          Card(
-            color: Colors.green.shade100,
-            elevation: 2,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: ListTile(
-              leading: const Icon(Icons.check_circle,
-                  color: Colors.green, size: 32),
-              title: const Text("System Status",
-                  style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(
-                warningCount > 0
-                    ? "$normalCount incubator(s) are functioning within optimal parameters."
-                    : "All incubator(s) are functioning within optimal parameters.",
+          // System Overview Title
+          Text(
+            "System Overview",
+            style: Theme.of(context)
+                .textTheme
+                .titleLarge
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 15),
+
+          // Only show stable incubators section if there are stable incubators
+          if (normalIncubators.isNotEmpty) ...[
+            Card(
+              color: Colors.green.shade100,
+              elevation: 2,
+              shape:
+                  RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.verified,
+                          color: Colors.green.shade700,
+                          size: 32,
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          "Stable Incubators",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      "$normalCount incubator(s) operating within optimal parameters",
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    const SizedBox(height: 12),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    ...normalIncubators.map((name) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        child: GestureDetector(
+                          onTap: () async {
+                            // Navigate directly to this incubator's dashboard
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => Dashboard(
+                                  incubatorName: name,
+                                  userName: userName,
+                                  themeNotifier: widget.themeNotifier,
+                                  incubatorData: incubatorData,
+                                  onDataChanged: updateIncubatorData,
+                                ),
+                              ),
+                            );
+                            
+                            // Update counts when returning from dashboard
+                            if (mounted) {
+                              _updateCounts();
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(12.0),
+                            decoration: BoxDecoration(
+                              color: Colors.green.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.green.shade200,
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.check_circle_outline,
+                                  color: Colors.green,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Text(
+                                    name,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green.shade700,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  "All systems normal",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.green.shade600,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  Icons.arrow_forward_ios,
+                                  color: Colors.green.shade400,
+                                  size: 16,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ],
+                ),
               ),
             ),
-          ),
+          ],
 
+          // Only show warnings section if there are warning incubators
           if (warningIncubators.isNotEmpty) ...[
             const SizedBox(height: 20),
             Row(
@@ -188,35 +311,107 @@ class _OverviewPageState extends State<OverviewPage> {
               ],
             ),
             const SizedBox(height: 10),
-            ...warningIncubators.map((incubator) => Card(
-                  color: Colors.orange.shade100,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(12.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  incubator,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 6),
-                                ...warningDetails[incubator]!.map((issue) =>
-                                    Text("- $issue",
-                                        style: const TextStyle(fontSize: 13))),
-                              ]),
+            ...warningIncubators.map((incubator) => GestureDetector(
+                  onTap: () async {
+                    // Navigate directly to this incubator's dashboard to address the warning
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => Dashboard(
+                          incubatorName: incubator,
+                          userName: userName,
+                          themeNotifier: widget.themeNotifier,
+                          incubatorData: incubatorData,
+                          onDataChanged: updateIncubatorData,
                         ),
-                        const Icon(Icons.error, color: Colors.red),
-                      ],
+                      ),
+                    );
+                    
+                    // Update counts when returning from dashboard
+                    if (mounted) {
+                      _updateCounts();
+                    }
+                  },
+                  child: Card(
+                    color: Colors.orange.shade100,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12.0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    incubator,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  ...warningDetails[incubator]!.map((issue) =>
+                                      Text("- $issue",
+                                          style: const TextStyle(fontSize: 13))),
+                                ]),
+                          ),
+                          Column(
+                            children: [
+                              const Icon(Icons.error, color: Colors.red),
+                              const SizedBox(height: 4),
+                              Icon(
+                                Icons.arrow_forward_ios,
+                                color: Colors.orange.shade400,
+                                size: 16,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 )),
+          ],
+
+          // Show a message when there are no status updates to display
+          if (normalIncubators.isEmpty && warningIncubators.isEmpty) ...[
+            const SizedBox(height: 20),
+            Card(
+              color: Colors.blue.shade50,
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.sensors,
+                      color: Colors.blue.shade600,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      "System Monitoring",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: Colors.blue.shade700,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "All incubators are being monitored. Status updates will appear here when conditions change.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.blue.shade600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
 
           const SizedBox(height: 30),
@@ -235,7 +430,8 @@ class _OverviewPageState extends State<OverviewPage> {
                   title: Text(incubator),
                   trailing: const Icon(Icons.arrow_forward_ios),
                   onTap: () async {
-                    final result = await Navigator.push(
+                    // Navigate to dashboard - it will control the data simulation
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => Dashboard(
@@ -247,9 +443,10 @@ class _OverviewPageState extends State<OverviewPage> {
                         ),
                       ),
                     );
-                    if (result != null &&
-                        result is Map<String, Map<String, dynamic>>) {
-                      updateIncubatorData(result);
+                    
+                    // Update counts when returning from dashboard
+                    if (mounted) {
+                      _updateCounts();
                     }
                   },
                 ),
