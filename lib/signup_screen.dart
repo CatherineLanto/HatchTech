@@ -170,7 +170,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
-    // Check if username already exists
     final prefs = await SharedPreferences.getInstance();
     final existingUsers = prefs.getStringList('registered_users') ?? [];
     final userKey = _username.text.trim().toLowerCase().replaceAll(' ', '');
@@ -183,22 +182,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
-    // Save the new user account
     try {
       final username = _username.text.trim();
-      // userKey already defined above with consistent formatting
-      
-      // Add to list of registered users
+
       existingUsers.add(userKey);
       await prefs.setStringList('registered_users', existingUsers);
       
-      // Save user credentials and info
       await prefs.setString('user_password_$userKey', _password.text);
       await prefs.setString('user_email_$userKey', _email.text.trim());
       await prefs.setString('user_name_$userKey', username);
       await prefs.setString('original_login_name_$userKey', username);
       
-      // Set current user session immediately after account creation
       await prefs.setString('current_user', userKey);
       
       setState(() {
@@ -275,9 +269,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: isDarkMode ? [
-              const Color(0xFF0D1117), // Dark navy
-              const Color(0xFF121212), // Dark background
-              const Color(0xFF1E1E1E), // Slightly lighter dark
+              const Color(0xFF0D1117), 
+              const Color(0xFF121212), 
+              const Color(0xFF1E1E1E), 
             ] : [
               Colors.blue.shade50,
               Colors.white,

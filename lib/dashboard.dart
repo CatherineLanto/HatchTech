@@ -47,7 +47,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     
     currentUserName = widget.userName;
     
-    // Initialize animation controller
     _warningAnimationController = AnimationController(
       duration: const Duration(milliseconds: 500),
       vsync: this,
@@ -60,7 +59,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     if (widget.incubatorData != null && widget.incubatorData!.isNotEmpty) {
       incubatorData.addAll(widget.incubatorData!);
     } else {
-      // Set better default values within optimal ranges
       incubatorData.addAll({
         'Incubator 1': {'temperature': 37.5, 'humidity': 50.0, 'oxygen': 20.5, 'co2': 800.0, 'eggTurning': true, 'lighting': true},
         'Incubator 2': {'temperature': 37.8, 'humidity': 55.0, 'oxygen': 20.0, 'co2': 750.0, 'eggTurning': false, 'lighting': false},
@@ -68,35 +66,32 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     }
     
     selectedIncubator = widget.incubatorName;
-    // Reasonable update frequency for good user experience
     dataUpdateTimer = Timer.periodic(const Duration(seconds: 2), (_) => updateSensorData());
   }
 
   void updateSensorData() {
     setState(() {
       incubatorData.forEach((key, values) {
-        // More realistic simulation ranges that occasionally cross thresholds
         values['temperature'] = _clampValue(
-          values['temperature'] + (Random().nextDouble() - 0.5) * 0.8, // Smaller temperature changes
-          35.0, 40.0 // Realistic range
+          values['temperature'] + (Random().nextDouble() - 0.5) * 0.8, 
+          35.0, 40.0 
         );
         values['humidity'] = _clampValue(
-          values['humidity'] + (Random().nextDouble() - 0.5) * 6.0, // Moderate humidity changes
-          30.0, 70.0 // Range that sometimes goes out of 35-65% optimal
+          values['humidity'] + (Random().nextDouble() - 0.5) * 6.0, 
+          30.0, 70.0 
         );
         values['oxygen'] = _clampValue(
-          values['oxygen'] + (Random().nextDouble() - 0.5) * 1.0, // Small oxygen variation
-          18.0, 22.0 // Range that occasionally drops below 19%
+          values['oxygen'] + (Random().nextDouble() - 0.5) * 1.0, 
+          18.0, 22.0 
         );
         values['co2'] = _clampValue(
-          values['co2'] + (Random().nextDouble() - 0.5) * 100, // Moderate CO2 swings
-          600.0, 1100.0 // Range that sometimes crosses 900 threshold
+          values['co2'] + (Random().nextDouble() - 0.5) * 100, 
+          600.0, 1100.0 
         );
       });
       checkAlerts();
     });
     
-    // Immediately notify overview of data changes for real-time synchronization
     _notifyDataChanged();
   }
 
@@ -110,9 +105,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
 
     List<Map<String, dynamic>> alerts = [];
 
-    // Only check incubators that are NOT currently selected to avoid redundancy
     incubatorData.forEach((key, values) {
-      if (key == selectedIncubator) return; // Skip current incubator
+      if (key == selectedIncubator) return; 
       
       // Critical alerts (red)
       if (values['temperature'] < 36 || values['temperature'] > 39) {
@@ -138,7 +132,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         });
       }
       
-      // Warning alerts (orange/yellow)
       if (values['humidity'] < 35 || values['humidity'] > 65) {
         alerts.add({
           'incubator': key,
@@ -171,7 +164,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       });
       _warningAnimationController.forward();
       
-      // Auto-dismiss after 15 seconds for non-critical alerts
       final hasCriticalAlert = alerts.any((alert) => alert['severity'] == 'critical');
       if (!hasCriticalAlert) {
         _autoDismissTimer?.cancel();
@@ -219,7 +211,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       selectedIncubator = newName;
     });
     checkAlerts();
-    // Immediately notify overview of new incubator
     _notifyDataChanged();
   }
 
@@ -326,14 +317,11 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                 ),
               );
 
-              // Handle both username changes (String) and incubator changes (bool)
               if (result != null) {
-                // Handle username change
                 if (result is String && result.isNotEmpty && result != currentUserName) {
                   setState(() {
                     currentUserName = result;
                   });
-                  // Notify overview of username change
                   if (widget.onUserNameChanged != null) {
                     widget.onUserNameChanged!(result);
                   }
@@ -346,7 +334,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                   checkAlerts();
                 });
                 
-                // Update data callback if result indicates changes
                 if (widget.onDataChanged != null) {
                   widget.onDataChanged!(Map.from(incubatorData));
                 }
@@ -466,7 +453,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   Widget buildSensorCard(String label, double value, IconData icon, {double max = 100}) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     double percentage = value / max;
-    // Use same thresholds as overview for consistent status display
     Color barColor = (label == 'Humidity' && (value < 35 || value > 65)) ||
             (label == 'Temperature' && (value < 36 || value > 39)) ||
             (label == 'Oxygen' && value < 19.0) ||
@@ -482,7 +468,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: isDarkMode ? Colors.black26 : Colors.grey.withOpacity(0.1),
+            color: isDarkMode ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
             blurRadius: 4,
           )
         ],
@@ -526,7 +512,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
           AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 300),
             style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: barColor.withAlpha(204),
+              color: barColor.withValues(alpha: 0.8),
             ),
             child: Text(label),
           ),
@@ -550,7 +536,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-           color: isDarkMode ? Colors.black26 : Colors.grey.withOpacity(0.1),
+           color: isDarkMode ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
             blurRadius: 4,
           ),
         ],
@@ -563,7 +549,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
             duration: const Duration(milliseconds: 400),
             tween: ColorTween(begin: Colors.grey, end: iconColor),
             builder: (context, color, child) {
-              // Only add rotation animation for sync icon (Egg Turning), not lightbulb
               if (label == 'Egg Turning') {
                 return AnimatedRotation(
                   duration: const Duration(milliseconds: 300),
@@ -588,7 +573,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
           AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 300),
             style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: iconColor.withAlpha(204),
+              color: iconColor.withValues(alpha: 0.8),
             ),
             child: Text(label),
           ),
@@ -635,7 +620,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Header
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -672,7 +656,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                       ),
                     ),
                     
-                    // Alerts List
                     Flexible(
                       child: ListView.separated(
                         shrinkWrap: true,

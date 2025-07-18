@@ -65,7 +65,6 @@ class _LoginScreenState extends State<LoginScreen> {
     final prefs = await SharedPreferences.getInstance();
     final userKey = inputUsername.toLowerCase().replaceAll(' ', '');
     
-    // Check registered users first
     final registeredUsers = prefs.getStringList('registered_users') ?? [];
     final storedPassword = prefs.getString('user_password_$userKey');
     
@@ -74,16 +73,12 @@ class _LoginScreenState extends State<LoginScreen> {
     
     if (registeredUsers.contains(userKey)) {
       if (storedPassword == inputPassword) {
-        // Valid registered user
         isValidLogin = true;
       } else {
-        // User exists but wrong password
         specificError = "Incorrect password for this account";
       }
     } else if (inputUsername == validUsername && inputPassword == validPassword) {
-      // Fallback to default admin account
       isValidLogin = true;
-      // Register the admin account in the system if not already done
       if (!registeredUsers.contains(userKey)) {
         registeredUsers.add(userKey);
         await prefs.setStringList('registered_users', registeredUsers);
@@ -92,7 +87,6 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.setString('original_login_name_$userKey', validUsername);
       }
     } else {
-      // Check if username exists with different case/spacing
       bool foundSimilar = false;
       for (String existingUser in registeredUsers) {
         final existingOriginal = prefs.getString('original_login_name_$existingUser') ?? '';
@@ -114,19 +108,15 @@ class _LoginScreenState extends State<LoginScreen> {
         errorMessage = null;
       });
 
-      // Load user-specific data from SharedPreferences
       final savedUsername = prefs.getString('user_name_$userKey') ?? inputUsername;
       
-      // Save the original login username for this specific user (only if not already saved)
       if (!prefs.containsKey('original_login_name_$userKey')) {
         await prefs.setString('original_login_name_$userKey', inputUsername);
       }
       
-      // Set current user identifier for other screens to use
       await prefs.setString('current_user', userKey);
 
       Navigator.pushReplacement(
-        // ignore: use_build_context_synchronously
         context,
         MaterialPageRoute(
           builder: (_) => OverviewPage(
@@ -310,9 +300,9 @@ class _LoginScreenState extends State<LoginScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: isDarkMode ? [
-              const Color(0xFF0D1117), // Dark navy
-              const Color(0xFF121212), // Dark background
-              const Color(0xFF1E1E1E), // Slightly lighter dark
+              const Color(0xFF0D1117), 
+              const Color(0xFF121212), 
+              const Color(0xFF1E1E1E), 
             ] : [
               Colors.blue.shade50,
               Colors.white,

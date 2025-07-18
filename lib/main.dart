@@ -46,18 +46,17 @@ class HatchTechApp extends StatelessWidget {
               seedColor: Colors.blueAccent, 
               brightness: Brightness.dark,
             ).copyWith(
-              // Enhanced contrast colors for dark mode
-              surface: const Color(0xFF121212), // Darker background
-              onSurface: Colors.white, // High contrast text
-              surfaceContainerHighest: const Color(0xFF1E1E1E), // Card backgrounds
-              onSurfaceVariant: const Color(0xFFE1E1E1), // Secondary text
-              primary: const Color(0xFF6BB6FF), // Brighter blue for better visibility
-              onPrimary: Colors.black, // High contrast on primary
-              secondary: const Color(0xFF03DAC6), // Teal accent
+              surface: const Color(0xFF121212), 
+              onSurface: Colors.white, 
+              surfaceContainerHighest: const Color(0xFF1E1E1E), 
+              onSurfaceVariant: const Color(0xFFE1E1E1), 
+              primary: const Color(0xFF6BB6FF), 
+              onPrimary: Colors.black, 
+              secondary: const Color(0xFF03DAC6), 
               onSecondary: Colors.black,
-              error: const Color(0xFFCF6679), // Softer red for dark mode
+              error: const Color(0xFFCF6679), 
               onError: Colors.black,
-              outline: const Color(0xFF3A3A3A), // Border colors
+              outline: const Color(0xFF3A3A3A),
             ),
             scaffoldBackgroundColor: const Color(0xFF121212),
             cardColor: const Color(0xFF1E1E1E),
@@ -65,7 +64,6 @@ class HatchTechApp extends StatelessWidget {
               backgroundColor: Color(0xFF1E1E1E),
             ),
             textTheme: GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme).copyWith(
-              // Enhanced text contrast while preserving font family
               bodyLarge: GoogleFonts.poppins(color: Colors.white, fontSize: 16),
               bodyMedium: GoogleFonts.poppins(color: Colors.white, fontSize: 14),
               titleLarge: GoogleFonts.poppins(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
@@ -75,7 +73,7 @@ class HatchTechApp extends StatelessWidget {
             ),
             inputDecorationTheme: InputDecorationTheme(
               filled: true,
-              fillColor: const Color(0xFF2A2A2A), // Darker input fields
+              fillColor: const Color(0xFF2A2A2A), 
               labelStyle: const TextStyle(color: Color(0xFFB0B0B0)),
               hintStyle: const TextStyle(color: Color(0xFF707070)),
               border: OutlineInputBorder(
@@ -93,8 +91,8 @@ class HatchTechApp extends StatelessWidget {
             ),
             elevatedButtonTheme: ElevatedButtonThemeData(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6BB6FF), // Brighter blue
-                foregroundColor: Colors.black, // High contrast text
+                backgroundColor: const Color(0xFF6BB6FF),
+                foregroundColor: Colors.black,
                 textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),

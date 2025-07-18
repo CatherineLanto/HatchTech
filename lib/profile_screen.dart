@@ -35,7 +35,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _loadOriginalLoginName() async {
     final prefs = await SharedPreferences.getInstance();
-    // Get the current user key from the system
     final currentUser = prefs.getString('current_user') ?? '';
     
     if (currentUser.isNotEmpty) {
@@ -51,8 +50,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       }
     }
     
-    // Fallback: if no current_user or no original_login_name found, 
-    // try using the current username as key (for backward compatibility)
     final userKey = widget.userName.toLowerCase().replaceAll(' ', '');
     final original = prefs.getString('original_login_name_$userKey');
     final email = prefs.getString('user_email_$userKey');
@@ -63,7 +60,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         userEmail = email ?? '${original.toLowerCase().replaceAll(' ', '')}@hatchtech.com';
       });
     } else {
-      // Last fallback: use the widget.userName as original
       setState(() {
         originalLoginName = widget.userName;
         userEmail = '${widget.userName.toLowerCase().replaceAll(' ', '')}@hatchtech.com';
@@ -89,9 +85,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () async {
-            // Auto-save and return username if changed
             await _saveUserData();
-            // ignore: use_build_context_synchronously
             Navigator.pop(context, _nameController.text.trim());
           },
         ),
@@ -215,7 +209,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 30),
 
-            // Just logout button - no save button needed since changes auto-save
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -229,16 +222,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 onPressed: () async {
-                  // Auto-save any username changes before logging out
                   await _saveUserData();
                   
-                  // Clear current user session
                   final prefs = await SharedPreferences.getInstance();
                   await prefs.remove('current_user');
                   
                   if (mounted) {
                     Navigator.pushAndRemoveUntil(
-                      // ignore: use_build_context_synchronously
                       context,
                       MaterialPageRoute(
                         builder: (_) => LoginScreen(
@@ -257,13 +247,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  // Auto-save user data when changes are made
   Future<void> _saveUserData() async {
     final prefs = await SharedPreferences.getInstance();
     final currentUser = prefs.getString('current_user') ?? '';
     
     if (currentUser.isNotEmpty) {
-      // Save username if it was changed
       final newUsername = _nameController.text.trim();
       if (newUsername.isNotEmpty) {
         await prefs.setString('user_name_$currentUser', newUsername);

@@ -23,22 +23,21 @@ class _OverviewPageState extends State<OverviewPage> {
   int normalCount = 0;
   int warningCount = 0;
   List<String> incubators = ['Incubator 1', 'Incubator 2'];
-  // Remove independent timer - overview will get data from dashboard
 
   Map<String, Map<String, dynamic>> incubatorData = {
     'Incubator 1': {
-      'temperature': 37.5, // Optimal range
-      'humidity': 50.0,    // Well within 35-65% range
-      'oxygen': 20.5,      // Above 19% threshold
-      'co2': 800.0,        // Below 900 threshold
+      'temperature': 37.5, 
+      'humidity': 50.0,  
+      'oxygen': 20.5,      
+      'co2': 800.0,      
       'eggTurning': true,
       'lighting': true
     },
     'Incubator 2': {
-      'temperature': 37.8, // Optimal range
-      'humidity': 55.0,    // Well within 35-65% range  
-      'oxygen': 20.0,      // Above 19% threshold
-      'co2': 750.0,        // Well below 900 threshold
+      'temperature': 37.8, 
+      'humidity': 55.0,    
+      'oxygen': 20.0,     
+      'co2': 750.0,       
       'eggTurning': false,
       'lighting': false
     },
@@ -57,21 +56,16 @@ class _OverviewPageState extends State<OverviewPage> {
 
   @override
   void dispose() {
-    // No timer to dispose
     super.dispose();
   }
-
-  // Remove simulation - overview just displays data from dashboard
 
   void updateIncubatorData(Map<String, Map<String, dynamic>> newData) {
     if (mounted) {
       setState(() {
-        // Simply update with dashboard data - no simulation needed
         incubatorData = Map.from(newData);
         incubators = newData.keys.toList();
         _updateCounts();
       });
-      // Auto-save data after update
       _saveUserData();
     }
   }
@@ -86,7 +80,6 @@ class _OverviewPageState extends State<OverviewPage> {
     incubatorData.forEach((name, values) {
       List<String> issues = [];
 
-      // More sensitive thresholds for more dynamic status changes
       if (values['humidity'] < 35 || values['humidity'] > 65) {
         issues.add("Humidity out of range");
       }
@@ -96,7 +89,7 @@ class _OverviewPageState extends State<OverviewPage> {
       if (values['oxygen'] < 19) {
         issues.add("Low oxygen level");
       }
-      if (values['co2'] > 900) { // Lower threshold for more frequent warnings
+      if (values['co2'] > 900) { 
         issues.add("High CO₂ level");
       }
 
@@ -116,13 +109,11 @@ class _OverviewPageState extends State<OverviewPage> {
     });
   }
 
-  // Load user data from SharedPreferences
   Future<void> _loadUserData() async {
     final prefs = await SharedPreferences.getInstance();
     final currentUser = prefs.getString('current_user') ?? '';
     
     if (currentUser.isNotEmpty) {
-      // Load saved username
       final savedUsername = prefs.getString('user_name_$currentUser');
       if (savedUsername != null) {
         setState(() {
@@ -130,7 +121,6 @@ class _OverviewPageState extends State<OverviewPage> {
         });
       }
       
-      // Load saved incubator data
       final savedData = prefs.getString('incubator_data_$currentUser');
       if (savedData != null) {
         try {
@@ -141,15 +131,12 @@ class _OverviewPageState extends State<OverviewPage> {
             incubators = incubatorData.keys.toList();
           });
         } catch (e) {
-          // Handle JSON decode error gracefully - initialize default data
           _initializeDefaultData();
         }
       } else {
-        // No saved data for this user - initialize default data
         _initializeDefaultData();
       }
     } else {
-      // No current user - use default data as fallback
       _initializeDefaultData();
     }
     _updateCounts();
@@ -177,20 +164,16 @@ class _OverviewPageState extends State<OverviewPage> {
       };
       incubators = incubatorData.keys.toList();
     });
-    // Save this default data for the current user
     _saveUserData();
   }
 
-  // Save user data to SharedPreferences
   Future<void> _saveUserData() async {
     final prefs = await SharedPreferences.getInstance();
     final currentUser = prefs.getString('current_user') ?? '';
     
     if (currentUser.isNotEmpty) {
-      // Save username
       await prefs.setString('user_name_$currentUser', userName);
       
-      // Save incubator data
       final dataToSave = json.encode(incubatorData);
       await prefs.setString('incubator_data_$currentUser', dataToSave);
     }
@@ -223,20 +206,15 @@ class _OverviewPageState extends State<OverviewPage> {
                 ),
               );
 
-              // Always update incubator list and counts when returning from profile
-              // since incubators might have been added, deleted, or renamed
               setState(() {
-                // Force a complete refresh of the incubator list
                 incubators = List<String>.from(incubatorData.keys);
                 _updateCounts();
               });
               
-              // Handle username change separately
               if (result is String && result.isNotEmpty) {
                 setState(() {
                   userName = result;
                 });
-                // Save username change
                 _saveUserData();
               }
             },
@@ -265,7 +243,6 @@ class _OverviewPageState extends State<OverviewPage> {
           ),
           const SizedBox(height: 15),
 
-          // Only show stable incubators section if there are stable incubators
           if (normalIncubators.isNotEmpty) ...[
             Card(
               color: isDarkMode ? const Color(0xFF1B4332) : Colors.green.shade100,
@@ -313,7 +290,6 @@ class _OverviewPageState extends State<OverviewPage> {
                           curve: Curves.easeOutBack,
                           child: GestureDetector(
                             onTap: () async {
-                              // Navigate directly to this incubator's dashboard
                               await Navigator.push(
                                 context,
                                 PageRouteBuilder(
@@ -345,7 +321,6 @@ class _OverviewPageState extends State<OverviewPage> {
                                 ),
                               );
                               
-                              // Update counts when returning from dashboard
                               if (mounted) {
                                 _updateCounts();
                               }
@@ -405,7 +380,6 @@ class _OverviewPageState extends State<OverviewPage> {
             ),
           ],
 
-          // Only show warnings section if there are warning incubators
           if (warningIncubators.isNotEmpty) ...[
             const SizedBox(height: 20),
             Row(
@@ -425,7 +399,6 @@ class _OverviewPageState extends State<OverviewPage> {
             const SizedBox(height: 10),
             ...warningIncubators.map((incubator) => GestureDetector(
                   onTap: () async {
-                    // Navigate directly to this incubator's dashboard to address the warning
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -445,7 +418,6 @@ class _OverviewPageState extends State<OverviewPage> {
                       ),
                     );
                     
-                    // Update counts when returning from dashboard
                     if (mounted) {
                       _updateCounts();
                     }
@@ -492,7 +464,6 @@ class _OverviewPageState extends State<OverviewPage> {
                 )),
           ],
 
-          // Show a message when there are no status updates to display
           if (normalIncubators.isEmpty && warningIncubators.isEmpty) ...[
             const SizedBox(height: 20),
             Card(
@@ -548,7 +519,6 @@ class _OverviewPageState extends State<OverviewPage> {
                   title: Text(incubator),
                   trailing: const Icon(Icons.arrow_forward_ios),
                   onTap: () async {
-                    // Navigate to dashboard - it will control the data simulation
                     await Navigator.push(
                       context,
                       MaterialPageRoute(
@@ -568,7 +538,6 @@ class _OverviewPageState extends State<OverviewPage> {
                       ),
                     );
                     
-                    // Update counts when returning from dashboard
                     if (mounted) {
                       _updateCounts();
                     }
