@@ -510,7 +510,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
           AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 300),
             style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: barColor.withOpacity(0.8),
+              color: barColor.withAlpha(204),
             ),
             child: Text(label),
           ),
@@ -564,7 +564,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
           AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 300),
             style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: iconColor.withOpacity(0.8),
+              color: iconColor.withAlpha(204),
             ),
             child: Text(label),
           ),

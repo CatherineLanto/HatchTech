@@ -24,6 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _nameController;
   bool _isEditing = false;
   String originalLoginName = '';
+  String userEmail = '';
 
   @override
   void initState() {
@@ -39,15 +40,33 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     if (currentUser.isNotEmpty) {
       final original = prefs.getString('original_login_name_$currentUser');
+      final email = prefs.getString('user_email_$currentUser');
+      
+      if (original != null && original.isNotEmpty) {
+        setState(() {
+          originalLoginName = original;
+          userEmail = email ?? '${original.toLowerCase().replaceAll(' ', '')}@hatchtech.com';
+        });
+        return;
+      }
+    }
+    
+    // Fallback: if no current_user or no original_login_name found, 
+    // try using the current username as key (for backward compatibility)
+    final userKey = widget.userName.toLowerCase().replaceAll(' ', '');
+    final original = prefs.getString('original_login_name_$userKey');
+    final email = prefs.getString('user_email_$userKey');
+    
+    if (original != null && original.isNotEmpty) {
       setState(() {
-        originalLoginName = original ?? widget.userName;
+        originalLoginName = original;
+        userEmail = email ?? '${original.toLowerCase().replaceAll(' ', '')}@hatchtech.com';
       });
     } else {
-      // Fallback: if no current_user, use the username as key (for backward compatibility)
-      final userKey = widget.userName.toLowerCase().replaceAll(' ', '');
-      final original = prefs.getString('original_login_name_$userKey');
+      // Last fallback: use the widget.userName as original
       setState(() {
-        originalLoginName = original ?? widget.userName;
+        originalLoginName = widget.userName;
+        userEmail = '${widget.userName.toLowerCase().replaceAll(' ', '')}@hatchtech.com';
       });
     }
   }
@@ -136,7 +155,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             const SizedBox(height: 6),
             Text(
               originalLoginName.isNotEmpty ? originalLoginName : widget.userName,
-              style: Theme.of(context).textTheme.bodyMedium,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Colors.grey[600],
+                fontStyle: FontStyle.italic,
+              ),
             ),
             const SizedBox(height: 30),
 
@@ -151,7 +173,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         color: Colors.blueAccent),
                     title: const Text('Email'),
                     subtitle: Text(
-                      '${originalLoginName.isNotEmpty ? originalLoginName.toLowerCase().replaceAll(' ', '') : _nameController.text.toLowerCase().replaceAll(' ', '')}@hatchtech.com',
+                      userEmail.isNotEmpty ? userEmail : '${originalLoginName.toLowerCase().replaceAll(' ', '')}@hatchtech.com',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
                   ),
                   const Divider(height: 0),

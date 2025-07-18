@@ -141,12 +141,44 @@ class _OverviewPageState extends State<OverviewPage> {
             incubators = incubatorData.keys.toList();
           });
         } catch (e) {
-          // Handle JSON decode error gracefully
-          // Optionally log or show an error message
+          // Handle JSON decode error gracefully - initialize default data
+          _initializeDefaultData();
         }
+      } else {
+        // No saved data for this user - initialize default data
+        _initializeDefaultData();
       }
+    } else {
+      // No current user - use default data as fallback
+      _initializeDefaultData();
     }
     _updateCounts();
+  }
+
+  void _initializeDefaultData() {
+    setState(() {
+      incubatorData = {
+        'Incubator 1': {
+          'temperature': 37.5,
+          'humidity': 50.0,
+          'oxygen': 20.5,
+          'co2': 800.0,
+          'eggTurning': true,
+          'lighting': true
+        },
+        'Incubator 2': {
+          'temperature': 37.8,
+          'humidity': 55.0,
+          'oxygen': 20.0,
+          'co2': 750.0,
+          'eggTurning': false,
+          'lighting': false
+        },
+      };
+      incubators = incubatorData.keys.toList();
+    });
+    // Save this default data for the current user
+    _saveUserData();
   }
 
   // Save user data to SharedPreferences
