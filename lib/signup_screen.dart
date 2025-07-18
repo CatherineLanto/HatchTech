@@ -57,11 +57,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   void _showSuccessDialog() {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     showDialog(
       context: context,
       barrierDismissible: false, 
       builder: (context) {
         return Dialog(
+          backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -74,22 +77,22 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   width: 80,
                   height: 80,
                   decoration: BoxDecoration(
-                    color: Colors.green.shade100,
+                    color: isDarkMode ? const Color(0xFF1B4332) : Colors.green.shade100,
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
                     Icons.check,
                     size: 40,
-                    color: Colors.green.shade600,
+                    color: isDarkMode ? const Color(0xFF40C057) : Colors.green.shade600,
                   ),
                 ),
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Welcome to HatchTech!',
                   style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blueAccent,
+                    color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blueAccent,
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -98,7 +101,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16,
-                    color: Colors.grey.shade600,
+                    color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey.shade600,
                   ),
                 ),
                 const SizedBox(height: 24),
@@ -213,24 +216,46 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   InputDecoration _inputDecoration(String label, IconData icon) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, color: Colors.blueAccent),
+      prefixIcon: Icon(
+        icon, 
+        color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blueAccent,
+      ),
       filled: true,
-      fillColor: Theme.of(context).brightness == Brightness.dark 
-          ? Colors.grey.shade800 
+      fillColor: isDarkMode 
+          ? const Color(0xFF2A2A2A)
           : Colors.grey.shade100,
+      labelStyle: TextStyle(
+        color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey.shade700,
+      ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: BorderSide(
+          color: isDarkMode ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDarkMode ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
+        borderSide: BorderSide(
+          color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blueAccent, 
+          width: 2,
+        ),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.red, width: 2),
+        borderSide: BorderSide(
+          color: isDarkMode ? const Color(0xFFCF6679) : Colors.red, 
+          width: 2,
+        ),
       ),
     );
   }
@@ -239,6 +264,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
     final double height = MediaQuery.of(context).size.height;
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       body: Container(
@@ -248,7 +274,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
+            colors: isDarkMode ? [
+              const Color(0xFF0D1117), // Dark navy
+              const Color(0xFF121212), // Dark background
+              const Color(0xFF1E1E1E), // Slightly lighter dark
+            ] : [
               Colors.blue.shade50,
               Colors.white,
               Colors.blue.shade50,
@@ -266,12 +296,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
+                  Text(
                     "Join HatchTech",
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blueAccent,
+                      color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blueAccent,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -279,7 +309,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     "Create your account to get started",
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.grey.shade600,
+                      color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey.shade600,
                     ),
                   ),
                   const SizedBox(height: 30),
@@ -331,13 +361,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.red.shade50,
+                              color: isDarkMode ? const Color(0xFF3D1A1A) : Colors.red.shade50,
                               borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: Colors.red.shade300),
+                              border: Border.all(
+                                color: isDarkMode ? const Color(0xFFCF6679) : Colors.red.shade300,
+                              ),
                             ),
                             child: Text(
                               errorMessage!,
-                              style: TextStyle(color: Colors.red.shade700),
+                              style: TextStyle(
+                                color: isDarkMode ? const Color(0xFFCF6679) : Colors.red.shade700,
+                              ),
                             ),
                           ),
                         const SizedBox(height: 20),

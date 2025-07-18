@@ -85,6 +85,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         title: const Text('Profile'),
         backgroundColor: Colors.blueAccent,
+        foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () async {
@@ -111,10 +112,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            const CircleAvatar(
+            CircleAvatar(
               radius: 60,
-              backgroundColor: Colors.blueAccent,
-              child: Icon(
+              backgroundColor: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent,
+              child: const Icon(
                 Icons.person,
                 size: 60,
                 color: Colors.white,
@@ -130,9 +131,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     controller: _nameController,
                     textAlign: TextAlign.center,
                     enabled: _isEditing,
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                    style: Theme.of(context).textTheme.headlineSmall,
                     decoration: const InputDecoration(
                       border: InputBorder.none,
                     ),
@@ -141,7 +140,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 IconButton(
                   icon: Icon(
                     _isEditing ? Icons.check_circle : Icons.edit,
-                    color: Colors.blueAccent,
+                    color: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent,
                   ),
                   onPressed: () {
                     setState(() {
@@ -156,7 +155,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Text(
               originalLoginName.isNotEmpty ? originalLoginName : widget.userName,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey[600],
+                color: isDark ? const Color(0xFFB0B0B0) : Colors.grey[600],
                 fontStyle: FontStyle.italic,
               ),
             ),
@@ -169,18 +168,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.email_outlined,
-                        color: Colors.blueAccent),
+                    leading: Icon(Icons.email_outlined,
+                        color: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent),
                     title: const Text('Email'),
                     subtitle: Text(
                       userEmail.isNotEmpty ? userEmail : '${originalLoginName.toLowerCase().replaceAll(' ', '')}@hatchtech.com',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                     ),
                   ),
                   const Divider(height: 0),
                   ListTile(
-                    leading: const Icon(Icons.devices,
-                        color: Colors.blueAccent),
+                    leading: Icon(Icons.devices,
+                        color: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent),
                     title: const Text('Manage Incubators'),
                     onTap: () {
                       showModalBottomSheet(
@@ -223,8 +222,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: const Icon(Icons.logout),
                 label: const Text('Log Out'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
-                  foregroundColor: Colors.white,
+                  backgroundColor: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent,
+                  foregroundColor: isDark ? Colors.black : Colors.white,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -292,9 +291,9 @@ class IncubatorManager extends StatelessWidget {
         children: [
           const Icon(Icons.devices, size: 40, color: Colors.blueAccent),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Your Incubators',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 20),
           ListView.separated(

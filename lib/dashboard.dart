@@ -225,14 +225,29 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
 
   void showRenameDialog(BuildContext context, String incubatorKey) {
   final TextEditingController controller = TextEditingController(text: incubatorKey);
+  final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
   showDialog(
     context: context,
     builder: (context) => AlertDialog(
-      title: const Text('Rename Incubator'),
+      backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : null,
+      title: Text(
+        'Rename Incubator',
+        style: TextStyle(
+          color: isDarkMode ? Colors.white : null,
+        ),
+      ),
       content: TextField(
         controller: controller,
-        decoration: const InputDecoration(labelText: 'New Incubator Name'),
+        style: TextStyle(
+          color: isDarkMode ? Colors.white : null,
+        ),
+        decoration: InputDecoration(
+          labelText: 'New Incubator Name',
+          labelStyle: TextStyle(
+            color: isDarkMode ? const Color(0xFFB0B0B0) : null,
+          ),
+        ),
       ),
       actions: [
         TextButton(
@@ -297,7 +312,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         backgroundColor: Colors.blueAccent,
         actions: [
           IconButton(
-            icon: const Icon(Icons.account_circle),
+            icon: const Icon(Icons.person),
             onPressed: () async {
               final result = await Navigator.push(
                 context,
@@ -449,24 +464,25 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   }
 
   Widget buildSensorCard(String label, double value, IconData icon, {double max = 100}) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     double percentage = value / max;
     // Use same thresholds as overview for consistent status display
     Color barColor = (label == 'Humidity' && (value < 35 || value > 65)) ||
             (label == 'Temperature' && (value < 36 || value > 39)) ||
             (label == 'Oxygen' && value < 19.0) ||
             (label == 'CO₂' && value > 900)
-        ? Colors.red
-        : Colors.blue;
+        ? (isDarkMode ? const Color(0xFFFF5252) : Colors.red)
+        : (isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Theme.of(context).shadowColor.withAlpha(50),
+            color: isDarkMode ? Colors.black26 : Colors.grey.withOpacity(0.1),
             blurRadius: 4,
           )
         ],
@@ -520,18 +536,21 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   }
 
   Widget buildToggleCard(String label, bool isOn, Function(bool) onChanged) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     IconData icon = label == 'Lighting' ? Icons.lightbulb : Icons.sync;
-    Color iconColor = isOn ? Colors.green : Colors.grey;
+    Color iconColor = isOn 
+        ? (isDarkMode ? const Color(0xFF40C057) : Colors.green) 
+        : (isDarkMode ? const Color(0xFF6C757D) : Colors.grey);
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
+        color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-           color: Theme.of(context).shadowColor.withAlpha(50),
+           color: isDarkMode ? Colors.black26 : Colors.grey.withOpacity(0.1),
             blurRadius: 4,
           ),
         ],
@@ -563,7 +582,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
               key: ValueKey(isOn),
               value: isOn,
               onChanged: onChanged,
-              activeColor: Colors.green,
+              activeColor: isDarkMode ? const Color(0xFF40C057) : Colors.green,
             ),
           ),
           AnimatedDefaultTextStyle(
@@ -579,6 +598,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   }
 
   Widget buildWarningDialog() {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return AnimatedBuilder(
       animation: _warningAnimation,
       builder: (context, child) {
@@ -595,13 +616,21 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                   gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      Colors.red.shade50,
-                      Colors.orange.shade50,
-                    ],
+                    colors: isDarkMode 
+                        ? [
+                            const Color(0xFF2D1B1B),
+                            const Color(0xFF2D1B0F),
+                          ]
+                        : [
+                            Colors.red.shade50,
+                            Colors.orange.shade50,
+                          ],
                   ),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.red.shade300, width: 2),
+                  border: Border.all(
+                    color: isDarkMode ? const Color(0xFFFF5252) : Colors.red.shade300, 
+                    width: 2
+                  ),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -610,13 +639,14 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        color: Colors.red.shade100,
+                        color: isDarkMode ? const Color(0xFF3D2525) : Colors.red.shade100,
                         borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
                       ),
                       child: Row(
                         children: [
                           Icon(Icons.warning_amber_rounded, 
-                               color: Colors.red.shade700, size: 28),
+                               color: isDarkMode ? const Color(0xFFFF5252) : Colors.red.shade700, 
+                               size: 28),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(
@@ -624,7 +654,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                                   ? 'Alert from Other Incubator'
                                   : 'Alerts from Other Incubators',
                               style: TextStyle(
-                                color: Colors.red.shade700,
+                                color: isDarkMode ? const Color(0xFFFF5252) : Colors.red.shade700,
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -633,7 +663,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                           Text(
                             '${currentAlerts.length}',
                             style: TextStyle(
-                              color: Colors.red.shade700,
+                              color: isDarkMode ? const Color(0xFFFF5252) : Colors.red.shade700,
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
@@ -658,13 +688,13 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                             margin: const EdgeInsets.symmetric(vertical: 4),
                             decoration: BoxDecoration(
                               color: isCritical 
-                                  ? Colors.red.shade100 
-                                  : Colors.orange.shade100,
+                                  ? (isDarkMode ? const Color(0xFF3D2525) : Colors.red.shade100)
+                                  : (isDarkMode ? const Color(0xFF3D2B1F) : Colors.orange.shade100),
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
                                 color: isCritical 
-                                    ? Colors.red.shade300 
-                                    : Colors.orange.shade300,
+                                    ? (isDarkMode ? const Color(0xFFFF5252) : Colors.red.shade300)
+                                    : (isDarkMode ? const Color(0xFFFF8C42) : Colors.orange.shade300),
                               ),
                             ),
                             child: Row(
@@ -672,8 +702,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                                 Icon(
                                   alert['icon'],
                                   color: isCritical 
-                                      ? Colors.red.shade700 
-                                      : Colors.orange.shade700,
+                                      ? (isDarkMode ? const Color(0xFFFF5252) : Colors.red.shade700)
+                                      : (isDarkMode ? const Color(0xFFFF8C42) : Colors.orange.shade700),
                                   size: 24,
                                 ),
                                 const SizedBox(width: 12),
@@ -687,8 +717,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                                           fontWeight: FontWeight.bold,
                                           fontSize: 14,
                                           color: isCritical 
-                                              ? Colors.red.shade700 
-                                              : Colors.orange.shade700,
+                                              ? (isDarkMode ? const Color(0xFFFF5252) : Colors.red.shade700)
+                                              : (isDarkMode ? const Color(0xFFFF8C42) : Colors.orange.shade700),
                                         ),
                                       ),
                                       const SizedBox(height: 2),
@@ -696,7 +726,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                                         alert['message'],
                                         style: TextStyle(
                                           fontSize: 13,
-                                          color: Colors.grey.shade700,
+                                          color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey.shade700,
                                         ),
                                       ),
                                     ],
@@ -707,8 +737,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                                     horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: isCritical 
-                                        ? Colors.red.shade200 
-                                        : Colors.orange.shade200,
+                                        ? (isDarkMode ? const Color(0xFF5D3A3A) : Colors.red.shade200)
+                                        : (isDarkMode ? const Color(0xFF5D4A33) : Colors.orange.shade200),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Text(
@@ -717,8 +747,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                                       fontSize: 10,
                                       fontWeight: FontWeight.bold,
                                       color: isCritical 
-                                          ? Colors.red.shade700 
-                                          : Colors.orange.shade700,
+                                          ? (isDarkMode ? const Color(0xFFFF5252) : Colors.red.shade700)
+                                          : (isDarkMode ? const Color(0xFFFF8C42) : Colors.orange.shade700),
                                     ),
                                   ),
                                 ),
@@ -741,8 +771,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                           icon: const Icon(Icons.close, size: 18),
                           label: const Text('Dismiss'),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red.shade600,
-                            foregroundColor: Colors.white,
+                            backgroundColor: isDarkMode ? const Color(0xFFFF5252) : Colors.red.shade600,
+                            foregroundColor: isDarkMode ? Colors.black : Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),

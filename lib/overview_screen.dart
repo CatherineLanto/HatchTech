@@ -198,11 +198,14 @@ class _OverviewPageState extends State<OverviewPage> {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text("Overview"),
         backgroundColor: Colors.blueAccent,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.person),
@@ -265,7 +268,7 @@ class _OverviewPageState extends State<OverviewPage> {
           // Only show stable incubators section if there are stable incubators
           if (normalIncubators.isNotEmpty) ...[
             Card(
-              color: Colors.green.shade100,
+              color: isDarkMode ? const Color(0xFF1B4332) : Colors.green.shade100,
               elevation: 2,
               shape:
                   RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -278,7 +281,7 @@ class _OverviewPageState extends State<OverviewPage> {
                       children: [
                         Icon(
                           Icons.verified,
-                          color: Colors.green.shade700,
+                          color: isDarkMode ? const Color(0xFF40C057) : Colors.green.shade700,
                           size: 32,
                         ),
                         const SizedBox(width: 12),
@@ -287,7 +290,7 @@ class _OverviewPageState extends State<OverviewPage> {
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 18,
-                            color: Colors.green.shade700,
+                            color: isDarkMode ? const Color(0xFF40C057) : Colors.green.shade700,
                           ),
                         ),
                       ],
@@ -350,10 +353,10 @@ class _OverviewPageState extends State<OverviewPage> {
                             child: Container(
                               padding: const EdgeInsets.all(12.0),
                               decoration: BoxDecoration(
-                                color: Colors.green.shade50,
+                                color: isDarkMode ? const Color(0xFF1B4332) : Colors.green.shade50,
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: Colors.green.shade200,
+                                  color: isDarkMode ? const Color(0xFF40C057) : Colors.green.shade200,
                                   width: 1,
                                 ),
                               ),
@@ -361,7 +364,7 @@ class _OverviewPageState extends State<OverviewPage> {
                                 children: [
                                   Icon(
                                     Icons.check_circle_outline,
-                                    color: Colors.green,
+                                    color: isDarkMode ? const Color(0xFF40C057) : Colors.green,
                                     size: 20,
                                   ),
                                   const SizedBox(width: 12),
@@ -370,7 +373,7 @@ class _OverviewPageState extends State<OverviewPage> {
                                       name,
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.green.shade700,
+                                        color: isDarkMode ? const Color(0xFF40C057) : Colors.green.shade700,
                                         fontSize: 15,
                                       ),
                                     ),
@@ -379,14 +382,14 @@ class _OverviewPageState extends State<OverviewPage> {
                                     "All systems normal",
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.green.shade600,
+                                      color: isDarkMode ? const Color(0xFF51CF66) : Colors.green.shade600,
                                       fontStyle: FontStyle.italic,
                                     ),
                                   ),
                                   const SizedBox(width: 8),
                                   Icon(
                                     Icons.arrow_forward_ios,
-                                    color: Colors.green.shade400,
+                                    color: isDarkMode ? const Color(0xFF69DB7C) : Colors.green.shade400,
                                     size: 16,
                                   ),
                                 ],
@@ -448,7 +451,7 @@ class _OverviewPageState extends State<OverviewPage> {
                     }
                   },
                   child: Card(
-                    color: Colors.orange.shade100,
+                    color: isDarkMode ? const Color(0xFF2D1B0F) : Colors.orange.shade100,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10)),
                     child: Padding(
@@ -473,11 +476,11 @@ class _OverviewPageState extends State<OverviewPage> {
                           ),
                           Column(
                             children: [
-                              const Icon(Icons.error, color: Colors.red),
+                              Icon(Icons.error, color: isDarkMode ? const Color(0xFFFF5252) : Colors.red),
                               const SizedBox(height: 4),
                               Icon(
                                 Icons.arrow_forward_ios,
-                                color: Colors.orange.shade400,
+                                color: isDarkMode ? const Color(0xFFFF8C42) : Colors.orange.shade400,
                                 size: 16,
                               ),
                             ],
@@ -493,7 +496,7 @@ class _OverviewPageState extends State<OverviewPage> {
           if (normalIncubators.isEmpty && warningIncubators.isEmpty) ...[
             const SizedBox(height: 20),
             Card(
-              color: Colors.blue.shade50,
+              color: isDarkMode ? const Color(0xFF0F1B2D) : Colors.blue.shade50,
               elevation: 2,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               child: Padding(
@@ -502,7 +505,7 @@ class _OverviewPageState extends State<OverviewPage> {
                   children: [
                     Icon(
                       Icons.sensors,
-                      color: Colors.blue.shade600,
+                      color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue.shade600,
                       size: 48,
                     ),
                     const SizedBox(height: 12),
@@ -511,7 +514,7 @@ class _OverviewPageState extends State<OverviewPage> {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
-                        color: Colors.blue.shade700,
+                        color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue.shade700,
                       ),
                     ),
                     const SizedBox(height: 8),
@@ -520,7 +523,7 @@ class _OverviewPageState extends State<OverviewPage> {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.blue.shade600,
+                        color: isDarkMode ? const Color(0xFF9FC5FF) : Colors.blue.shade600,
                       ),
                     ),
                   ],
@@ -538,7 +541,7 @@ class _OverviewPageState extends State<OverviewPage> {
           const SizedBox(height: 10),
 
           ...incubators.map((incubator) => Card(
-                color: Colors.grey.shade100,
+                color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.grey.shade100,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10)),
                 child: ListTile(

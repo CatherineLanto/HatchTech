@@ -251,24 +251,46 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   InputDecoration _inputDecoration(String label, IconData icon, BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
     return InputDecoration(
       labelText: label,
-      prefixIcon: Icon(icon, color: Colors.blueAccent),
+      prefixIcon: Icon(
+        icon, 
+        color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blueAccent,
+      ),
       filled: true,
-      fillColor: Theme.of(context).brightness == Brightness.dark 
-          ? Colors.grey.shade800 
+      fillColor: isDarkMode 
+          ? const Color(0xFF2A2A2A)
           : Colors.grey.shade100,
+      labelStyle: TextStyle(
+        color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey.shade700,
+      ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: BorderSide(
+          color: isDarkMode ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDarkMode ? const Color(0xFF3A3A3A) : Colors.grey.shade300,
+        ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.blueAccent, width: 2),
+        borderSide: BorderSide(
+          color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blueAccent, 
+          width: 2,
+        ),
       ),
       errorBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.red, width: 2),
+        borderSide: BorderSide(
+          color: isDarkMode ? const Color(0xFFCF6679) : Colors.red, 
+          width: 2,
+        ),
       ),
     );
   }
@@ -277,6 +299,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final double width = MediaQuery.of(context).size.width;
     final double height = MediaQuery.of(context).size.height;
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
       body: Container(
@@ -286,7 +309,11 @@ class _LoginScreenState extends State<LoginScreen> {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [
+            colors: isDarkMode ? [
+              const Color(0xFF0D1117), // Dark navy
+              const Color(0xFF121212), // Dark background
+              const Color(0xFF1E1E1E), // Slightly lighter dark
+            ] : [
               Colors.blue.shade50,
               Colors.white,
               Colors.blue.shade50,
@@ -304,12 +331,12 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text(
+                  Text(
                     "HatchTech",
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.bold,
-                      color: Colors.blueAccent,
+                      color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blueAccent,
                     ),
                   ),
                   const SizedBox(height: 30),
