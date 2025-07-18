@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hatchtech/main.dart';
 import 'overview_screen.dart';
 import 'signup_screen.dart';
 
@@ -22,14 +21,50 @@ class _LoginScreenState extends State<LoginScreen> {
 
   bool isLoginFailed = false;
   bool obscurePassword = true;
+  String? errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    _usernameController.addListener(_clearError);
+    _passwordController.addListener(_clearError);
+  }
+
+  @override
+  void dispose() {
+    _usernameController.removeListener(_clearError);
+    _passwordController.removeListener(_clearError);
+    _usernameController.dispose();
+    _passwordController.dispose();
+    _recoveryController.dispose();
+    super.dispose();
+  }
+
+  void _clearError() {
+    if (isLoginFailed) {
+      setState(() {
+        isLoginFailed = false;
+        errorMessage = null;
+      });
+    }
+  }
 
   void _handleLogin() {
     final inputUsername = _usernameController.text.trim();
     final inputPassword = _passwordController.text.trim();
 
+    if (inputUsername.isEmpty || inputPassword.isEmpty) {
+      setState(() {
+        isLoginFailed = true;
+        errorMessage = "Please fill in all fields";
+      });
+      return;
+    }
+
     if (inputUsername == validUsername && inputPassword == validPassword) {
       setState(() {
         isLoginFailed = false;
+        errorMessage = null;
       });
       Navigator.pushReplacement(
         context,
@@ -43,15 +78,117 @@ class _LoginScreenState extends State<LoginScreen> {
     } else {
       setState(() {
         isLoginFailed = true;
+        errorMessage = "Invalid username or password";
       });
     }
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$').hasMatch(email);
+  }
+
+  void _showPasswordResetSuccessDialog(String email) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade100,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.mark_email_read,
+                    color: Colors.blueAccent,
+                    size: 45,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Reset Link Sent!',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueAccent,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'We\'ve sent a password reset link to:',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  email,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueAccent,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Please check your email and follow the instructions to reset your password.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Got It',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showForgotPasswordDialog() {
     showDialog(
       context: context,
       builder: (context) {
-        return Dialog(
+        String? dialogErrorMessage;
+        
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Dialog(
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
@@ -75,15 +212,54 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 16),
                 TextField(
                   controller: _recoveryController,
+                  keyboardType: TextInputType.emailAddress,
+                  onChanged: (value) {
+                    if (dialogErrorMessage != null) {
+                      setDialogState(() {
+                        dialogErrorMessage = null;
+                      });
+                    }
+                  },
                   decoration: InputDecoration(
                     prefixIcon: const Icon(Icons.email_outlined),
-                    labelText: 'Username or Email',
+                    labelText: 'Email Address',
+                    filled: true,
+                    fillColor: Colors.grey.shade50,
                     border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(12),
                     ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: Colors.blueAccent),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.grey.shade300),
+                    ),
+                    errorBorder: dialogErrorMessage != null
+                        ? OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.red),
+                          )
+                        : null,
+                    focusedErrorBorder: dialogErrorMessage != null
+                        ? OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(color: Colors.red),
+                          )
+                        : null,
                   ),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
+                if (dialogErrorMessage != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      dialogErrorMessage!,
+                      style: const TextStyle(color: Colors.red, fontSize: 12),
+                    ),
+                  ),
+                const SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
@@ -97,13 +273,26 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(width: 8),
                     ElevatedButton.icon(
                       onPressed: () {
-                        String recoveryInput = _recoveryController.text.trim();
+                        String emailInput = _recoveryController.text.trim();
+                        
+                        if (emailInput.isEmpty) {
+                          setDialogState(() {
+                            dialogErrorMessage = 'Please enter an email address';
+                          });
+                          return;
+                        }
+                        
+                        if (!_isValidEmail(emailInput)) {
+                          setDialogState(() {
+                            dialogErrorMessage = 'Please enter a valid email address';
+                          });
+                          return;
+                        }
+                        
                         Navigator.pop(context);
                         _recoveryController.clear();
 
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Reset link sent to "$recoveryInput"')),
-                        );
+                        _showPasswordResetSuccessDialog(emailInput);
                       },
                       icon: const Icon(Icons.send),
                       label: const Text('Send Link'),
@@ -121,17 +310,27 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         );
+          },
+        );
       },
     );
   }
 
-  InputDecoration _inputDecoration(String label, IconData icon) {
+  InputDecoration _inputDecoration(String label, IconData icon, BuildContext context) {
     return InputDecoration(
       labelText: label,
       prefixIcon: Icon(icon),
       filled: true,
       fillColor: Theme.of(context).inputDecorationTheme.fillColor,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: Colors.blueAccent),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: Colors.grey.shade300),
+      ),
     );
   }
 
@@ -167,13 +366,13 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     TextField(
                       controller: _usernameController,
-                      decoration: _inputDecoration("Username", Icons.person),
+                      decoration: _inputDecoration("Username", Icons.person, context),
                     ),
                     const SizedBox(height: 16),
                     TextField(
                       controller: _passwordController,
                       obscureText: obscurePassword,
-                      decoration: _inputDecoration("Password", Icons.lock).copyWith(
+                      decoration: _inputDecoration("Password", Icons.lock, context).copyWith(
                         suffixIcon: IconButton(
                           icon: Icon(obscurePassword ? Icons.visibility_off : Icons.visibility),
                           onPressed: () => setState(() => obscurePassword = !obscurePassword),
@@ -181,12 +380,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     const SizedBox(height: 10),
-                    if (isLoginFailed)
-                      const Align(
+                    if (isLoginFailed && errorMessage != null)
+                      Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          'Invalid username or password',
-                          style: TextStyle(color: Colors.red),
+                          errorMessage!,
+                          style: const TextStyle(color: Colors.red),
                         ),
                       ),
                     Align(
@@ -221,7 +420,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             Navigator.pushReplacement(
                               context,
                               MaterialPageRoute(
-                                builder: (_) => SignUpScreen(themeNotifier: themeNotifier),
+                                builder: (_) => SignUpScreen(themeNotifier: widget.themeNotifier),
                               ),
                             );
                           },

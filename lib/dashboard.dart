@@ -39,7 +39,6 @@ class _DashboardState extends State<Dashboard> {
   void initState() {
     super.initState();
     
-    // Initialize with passed data or default data
     if (widget.incubatorData != null && widget.incubatorData!.isNotEmpty) {
       incubatorData.addAll(widget.incubatorData!);
     } else {
@@ -116,7 +115,7 @@ class _DashboardState extends State<Dashboard> {
       selectedIncubator = newName;
     });
     checkAlerts();
-    _notifyDataChanged(); // Notify parent about the change
+    _notifyDataChanged();
   }
 
   void showRenameDialog(BuildContext context, String incubatorKey) {
@@ -145,7 +144,7 @@ class _DashboardState extends State<Dashboard> {
                   selectedIncubator = newName;
                 }
               });
-              _notifyDataChanged(); // Notify parent about the change
+              _notifyDataChanged();
               Navigator.pop(context);
             }
           },

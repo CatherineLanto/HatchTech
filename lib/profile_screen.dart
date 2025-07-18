@@ -71,7 +71,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Username with Edit Icon
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -109,7 +108,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 30),
 
-            // Card Section
             Card(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -150,8 +148,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               return;
                             }
                             widget.incubatorData.remove(name);
-                            Navigator.pop(context); // Close bottom sheet
-                            Navigator.pop(context, true); // Notify Dashboard
+                            Navigator.pop(context); 
+                            Navigator.pop(context, true); 
                           },
                         ),
                       );
@@ -163,7 +161,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 30),
 
-            // Save and Logout Buttons
             Row(
               children: [
                 Expanded(
@@ -216,7 +213,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
-// IncubatorManager remains unchanged
 class IncubatorManager extends StatelessWidget {
   final Map<String, Map<String, dynamic>> incubatorData;
   final Function(String) onDelete;
@@ -268,7 +264,7 @@ class IncubatorManager extends StatelessWidget {
                               backgroundColor: Colors.blueAccent),
                           onPressed: () {
                             onDelete(name);
-                            Navigator.pop(ctx); // Close alert dialog
+                            Navigator.pop(ctx);
                           },
                           child: const Text('Delete'),
                         ),

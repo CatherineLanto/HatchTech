@@ -19,49 +19,158 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   bool obscurePassword = true;
   bool obscureConfirm = true;
+  
+  String? errorMessage;
+  bool hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _username.addListener(_clearError);
+    _email.addListener(_clearError);
+    _password.addListener(_clearError);
+    _confirmPassword.addListener(_clearError);
+  }
+
+  @override
+  void dispose() {
+    _username.removeListener(_clearError);
+    _email.removeListener(_clearError);
+    _password.removeListener(_clearError);
+    _confirmPassword.removeListener(_clearError);
+    _username.dispose();
+    _email.dispose();
+    _password.dispose();
+    _confirmPassword.dispose();
+    super.dispose();
+  }
+
+  void _clearError() {
+    if (hasError) {
+      setState(() {
+        hasError = false;
+        errorMessage = null;
+      });
+    }
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false, 
+      builder: (context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade100,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.check_circle,
+                    color: Colors.blueAccent,
+                    size: 50,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Account Created!',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blueAccent,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Welcome to HatchTech!\nYour account has been successfully created.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context); 
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => OverviewPage(
+                            userName: _username.text.trim(),
+                            themeNotifier: widget.themeNotifier,
+                          ),
+                        ),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blueAccent,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text(
+                      'Get Started',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   void _signUp() {
-    // Check if all fields are filled
     if (_username.text.trim().isEmpty || 
         _email.text.trim().isEmpty || 
         _password.text.trim().isEmpty || 
         _confirmPassword.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill in all fields")),
-      );
+      setState(() {
+        hasError = true;
+        errorMessage = "Please fill in all fields";
+      });
       return;
     }
 
-    // Check if passwords match
-    if (_password.text != _confirmPassword.text) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Passwords do not match")),
-      );
-      return;
-    }
-
-    // Basic email validation
     if (!_email.text.contains('@')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a valid email address")),
-      );
+      setState(() {
+        hasError = true;
+        errorMessage = "Please enter a valid email address";
+      });
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Account Created! Welcome to HatchTech!")),
-    );
+    if (_password.text != _confirmPassword.text) {
+      setState(() {
+        hasError = true;
+        errorMessage = "Passwords do not match";
+      });
+      return;
+    }
 
-    // Navigate directly to overview page with the new user's username
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => OverviewPage(
-          userName: _username.text.trim(),
-          themeNotifier: widget.themeNotifier,
-        ),
-      ),
-    );
+    setState(() {
+      hasError = false;
+      errorMessage = null;
+    });
+
+    _showSuccessDialog();
   }
 
   InputDecoration _inputDecoration(String label, IconData icon) {
@@ -143,7 +252,17 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 16),
+                    if (hasError && errorMessage != null)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          errorMessage!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                      ),
+                    if (hasError && errorMessage != null)
+                      const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity,
                       height: 50,

@@ -125,14 +125,12 @@ class _OverviewPageState extends State<OverviewPage> {
                 ),
               );
 
-              // Update username if a string is returned
               if (result is String && result.isNotEmpty) {
                 setState(() {
                   userName = result;
                 });
               }
 
-              // Also update incubators if user deleted one
               if (result == true || result is String) {
                 setState(() {
                   incubators = incubatorData.keys.toList();
@@ -155,7 +153,6 @@ class _OverviewPageState extends State<OverviewPage> {
           ),
           const SizedBox(height: 20),
 
-          // ✅ System Status Card
           Card(
             color: Colors.green.shade100,
             elevation: 2,
@@ -174,7 +171,6 @@ class _OverviewPageState extends State<OverviewPage> {
             ),
           ),
 
-          // ⚠️ Warnings Section
           if (warningIncubators.isNotEmpty) ...[
             const SizedBox(height: 20),
             Row(
@@ -231,7 +227,6 @@ class _OverviewPageState extends State<OverviewPage> {
           ),
           const SizedBox(height: 10),
 
-          // Normal Incubator Cards
           ...incubators.map((incubator) => Card(
                 color: Colors.grey.shade100,
                 shape: RoundedRectangleBorder(
