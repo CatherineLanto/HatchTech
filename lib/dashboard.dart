@@ -108,7 +108,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     incubatorData.forEach((key, values) {
       if (key == selectedIncubator) return; 
       
-      // Critical alerts (red)
       if (values['temperature'] < 36 || values['temperature'] > 39) {
         alerts.add({
           'incubator': key,
@@ -301,6 +300,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       appBar: AppBar(
         title: const Text('Dashboard'),
         backgroundColor: Colors.blueAccent,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
             icon: const Icon(Icons.person),
@@ -742,7 +742,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                       ),
                     ),
                     
-                    // Action Button
                     Container(
                       padding: const EdgeInsets.all(16),
                       child: SizedBox(
