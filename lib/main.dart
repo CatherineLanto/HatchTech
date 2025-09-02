@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'login_screen.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
+import 'auth_wrapper.dart';
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   runApp(const HatchTechApp());
 }
 
@@ -122,7 +128,7 @@ class HatchTechApp extends StatelessWidget {
               }),
             ),
           ),
-          home: LoginScreen(themeNotifier: themeNotifier),
+          home: AuthWrapper(themeNotifier: themeNotifier),
         );
       },
     );

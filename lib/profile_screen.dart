@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hatchtech/login_screen.dart';
+import 'services/auth_service.dart';
 
 class ProfileScreen extends StatefulWidget {
   final Map<String, Map<String, dynamic>> incubatorData;
@@ -23,6 +23,7 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _nameController;
   bool _isEditing = false;
+  bool _isLoading = false;
   String originalLoginName = '';
   String userEmail = '';
 
@@ -30,39 +31,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.userName);
-    _loadOriginalLoginName();
+    _loadFirebaseUserData();
   }
 
-  Future<void> _loadOriginalLoginName() async {
-    final prefs = await SharedPreferences.getInstance();
-    final currentUser = prefs.getString('current_user') ?? '';
-    
-    if (currentUser.isNotEmpty) {
-      final original = prefs.getString('original_login_name_$currentUser');
-      final email = prefs.getString('user_email_$currentUser');
-      
-      if (original != null && original.isNotEmpty) {
+  Future<void> _loadFirebaseUserData() async {
+    try {
+      final userData = await AuthService.getUserData();
+      if (userData != null && mounted) {
         setState(() {
-          originalLoginName = original;
-          userEmail = email ?? '${original.toLowerCase().replaceAll(' ', '')}@hatchtech.com';
+          originalLoginName = userData['username'] ?? widget.userName;
+          userEmail = userData['email'] ?? '';
+          _nameController.text = originalLoginName;
         });
-        return;
       }
-    }
-    
-    final userKey = widget.userName.toLowerCase().replaceAll(' ', '');
-    final original = prefs.getString('original_login_name_$userKey');
-    final email = prefs.getString('user_email_$userKey');
-    
-    if (original != null && original.isNotEmpty) {
-      setState(() {
-        originalLoginName = original;
-        userEmail = email ?? '${original.toLowerCase().replaceAll(' ', '')}@hatchtech.com';
-      });
-    } else {
+    } catch (e) {
+      // Handle error if needed
       setState(() {
         originalLoginName = widget.userName;
-        userEmail = '${widget.userName.toLowerCase().replaceAll(' ', '')}@hatchtech.com';
+        userEmail = AuthService.currentUser?.email ?? '';
       });
     }
   }
@@ -71,6 +57,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void dispose() {
     _nameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveUserData() async {
+    if (!_isEditing) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    final newUsername = _nameController.text.trim();
+    
+    // Only update if username has changed
+    bool usernameChanged = newUsername != originalLoginName;
+
+    if (usernameChanged && newUsername.isNotEmpty) {
+      final result = await AuthService.updateUserProfile(
+        username: newUsername,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+
+        if (result['success']) {
+          // Update local state
+          setState(() {
+            originalLoginName = newUsername;
+            _isEditing = false;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message']),
+              backgroundColor: Colors.green,
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result['message']),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } else {
+      setState(() {
+        _isLoading = false;
+        _isEditing = false;
+      });
+    }
   }
 
   @override
@@ -115,44 +153,93 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 color: Colors.white,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
 
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _nameController,
-                    textAlign: TextAlign.center,
-                    enabled: _isEditing,
-                    style: Theme.of(context).textTheme.headlineSmall,
-                    decoration: const InputDecoration(
-                      border: InputBorder.none,
+            // Username Display with Subtle Edit
+            GestureDetector(
+              onTap: () {
+                if (!_isEditing) {
+                  setState(() {
+                    _isEditing = true;
+                  });
+                }
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _isEditing 
+                    ? (isDark ? Colors.grey[800] : Colors.grey[100])
+                    : Colors.transparent,
+                  borderRadius: BorderRadius.circular(12),
+                  border: _isEditing 
+                    ? Border.all(
+                        color: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent,
+                        width: 1,
+                      )
+                    : null,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _nameController,
+                        enabled: _isEditing,
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                        decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          hintText: 'Tap to edit username',
+                          hintStyle: TextStyle(fontSize: 18),
+                        ),
+                        onSubmitted: (_) async {
+                          await _saveUserData();
+                        },
+                      ),
                     ),
-                  ),
+                    if (_isEditing) ...[
+                      IconButton(
+                        icon: Icon(
+                          Icons.close,
+                          color: Colors.grey[600],
+                          size: 20,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _nameController.text = originalLoginName;
+                            _isEditing = false;
+                          });
+                        },
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.check,
+                          color: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent,
+                          size: 20,
+                        ),
+                        onPressed: () async {
+                          await _saveUserData();
+                        },
+                      ),
+                    ] else ...[
+                      Icon(
+                        Icons.edit,
+                        color: Colors.grey[400],
+                        size: 16,
+                      ),
+                    ],
+                  ],
                 ),
-                IconButton(
-                  icon: Icon(
-                    _isEditing ? Icons.check_circle : Icons.edit,
-                    color: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent,
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _isEditing = !_isEditing;
-                    });
-                  },
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 6),
-            Text(
-              originalLoginName.isNotEmpty ? originalLoginName : widget.userName,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: isDark ? const Color(0xFFB0B0B0) : Colors.grey[600],
-                fontStyle: FontStyle.italic,
               ),
             ),
+
+            if (_isLoading)
+              const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: CircularProgressIndicator(),
+              ),
+
             const SizedBox(height: 30),
 
             Card(
@@ -224,10 +311,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onPressed: () async {
                   await _saveUserData();
                   
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.remove('current_user');
+                  // Sign out from Firebase
+                  await AuthService.signOut();
                   
                   if (mounted) {
+                    // Navigation will be handled automatically by AuthWrapper
                     Navigator.pushAndRemoveUntil(
                       context,
                       MaterialPageRoute(
@@ -245,18 +333,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _saveUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final currentUser = prefs.getString('current_user') ?? '';
-    
-    if (currentUser.isNotEmpty) {
-      final newUsername = _nameController.text.trim();
-      if (newUsername.isNotEmpty) {
-        await prefs.setString('user_name_$currentUser', newUsername);
-      }
-    }
   }
 }
 

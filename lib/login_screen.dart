@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'services/auth_service.dart';
 import 'overview_screen.dart';
 import 'signup_screen.dart';
 
@@ -17,11 +17,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _recoveryController = TextEditingController();
 
-  final String validUsername = "Hatchtech";
-  final String validPassword = "1234";
-
   bool isLoginFailed = false;
   bool obscurePassword = true;
+  bool isLoading = false;
   String? errorMessage;
 
   @override
@@ -62,65 +60,43 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final userKey = inputUsername.toLowerCase().replaceAll(' ', '');
-    
-    final registeredUsers = prefs.getStringList('registered_users') ?? [];
-    final storedPassword = prefs.getString('user_password_$userKey');
-    
-    bool isValidLogin = false;
-    String specificError = "Invalid username or password";
-    
-    if (registeredUsers.contains(userKey)) {
-      if (storedPassword == inputPassword) {
-        isValidLogin = true;
-      } else {
-        specificError = "Incorrect password for this account";
-      }
-    } else if (inputUsername == validUsername && inputPassword == validPassword) {
-      isValidLogin = true;
-      if (!registeredUsers.contains(userKey)) {
-        registeredUsers.add(userKey);
-        await prefs.setStringList('registered_users', registeredUsers);
-        await prefs.setString('user_password_$userKey', validPassword);
-        await prefs.setString('user_name_$userKey', validUsername);
-        await prefs.setString('original_login_name_$userKey', validUsername);
-      }
+    setState(() {
+      isLoading = true;
+      isLoginFailed = false;
+      errorMessage = null;
+    });
+
+    Map<String, dynamic> result;
+
+    // Check if input is email or username
+    if (inputUsername.contains('@')) {
+      // Sign in with email
+      result = await AuthService.signIn(
+        email: inputUsername,
+        password: inputPassword,
+      );
     } else {
-      bool foundSimilar = false;
-      for (String existingUser in registeredUsers) {
-        final existingOriginal = prefs.getString('original_login_name_$existingUser') ?? '';
-        if (existingOriginal.toLowerCase() == inputUsername.toLowerCase()) {
-          foundSimilar = true;
-          break;
-        }
-      }
-      if (foundSimilar) {
-        specificError = "Account found but username format doesn't match. Try the exact username you used during signup.";
-      } else {
-        specificError = "No account found with this username. Please check your username or sign up for a new account.";
-      }
+      // Sign in with username
+      result = await AuthService.signInWithUsername(
+        username: inputUsername,
+        password: inputPassword,
+      );
     }
 
-    if (isValidLogin) {
-      setState(() {
-        isLoginFailed = false;
-        errorMessage = null;
-      });
+    setState(() {
+      isLoading = false;
+    });
 
-      final savedUsername = prefs.getString('user_name_$userKey') ?? inputUsername;
-      
-      if (!prefs.containsKey('original_login_name_$userKey')) {
-        await prefs.setString('original_login_name_$userKey', inputUsername);
-      }
-      
-      await prefs.setString('current_user', userKey);
+    if (result['success']) {
+      // Get user data from Firestore
+      final userData = await AuthService.getUserData();
+      final username = userData?['username'] ?? 'User';
 
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
           builder: (_) => OverviewPage(
-            userName: savedUsername,
+            userName: username,
             themeNotifier: widget.themeNotifier,
           ),
         ),
@@ -128,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> {
     } else {
       setState(() {
         isLoginFailed = true;
-        errorMessage = specificError;
+        errorMessage = result['message'];
       });
     }
   }
@@ -215,7 +191,7 @@ class _LoginScreenState extends State<LoginScreen> {
               child: const Text('Cancel'),
             ),
             ElevatedButton(
-              onPressed: () {
+              onPressed: () async {
                 final email = _recoveryController.text.trim();
                 if (email.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -229,8 +205,18 @@ class _LoginScreenState extends State<LoginScreen> {
                   );
                   return;
                 }
+                
                 Navigator.pop(context);
-                _showPasswordResetSuccessDialog(email);
+                
+                final result = await AuthService.resetPassword(email: email);
+                
+                if (result['success']) {
+                  _showPasswordResetSuccessDialog(email);
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(result['message'])),
+                  );
+                }
               },
               child: const Text('Send Reset Link'),
             ),

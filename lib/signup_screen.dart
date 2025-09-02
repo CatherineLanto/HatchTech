@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'services/auth_service.dart';
 import 'login_screen.dart';
 import 'overview_screen.dart';
 
@@ -20,6 +20,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   bool obscurePassword = true;
   bool obscureConfirm = true;
+  bool isLoading = false;
   
   String? errorMessage;
   bool hasError = false;
@@ -170,41 +171,36 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final existingUsers = prefs.getStringList('registered_users') ?? [];
-    final userKey = _username.text.trim().toLowerCase().replaceAll(' ', '');
-    
-    if (existingUsers.contains(userKey)) {
+    if (_password.text.length < 6) {
       setState(() {
         hasError = true;
-        errorMessage = "Username already exists. Please choose a different one.";
+        errorMessage = "Password must be at least 6 characters long";
       });
       return;
     }
 
-    try {
-      final username = _username.text.trim();
+    setState(() {
+      isLoading = true;
+      hasError = false;
+      errorMessage = null;
+    });
 
-      existingUsers.add(userKey);
-      await prefs.setStringList('registered_users', existingUsers);
-      
-      await prefs.setString('user_password_$userKey', _password.text);
-      await prefs.setString('user_email_$userKey', _email.text.trim());
-      await prefs.setString('user_name_$userKey', username);
-      await prefs.setString('original_login_name_$userKey', username);
-      
-      await prefs.setString('current_user', userKey);
-      
-      setState(() {
-        hasError = false;
-        errorMessage = null;
-      });
+    final result = await AuthService.signUp(
+      email: _email.text.trim(),
+      password: _password.text,
+      username: _username.text.trim(),
+    );
 
+    setState(() {
+      isLoading = false;
+    });
+
+    if (result['success']) {
       _showSuccessDialog();
-    } catch (e) {
+    } else {
       setState(() {
         hasError = true;
-        errorMessage = "Failed to create account. Please try again.";
+        errorMessage = result['message'];
       });
     }
   }

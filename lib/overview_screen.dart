@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
+import 'services/auth_service.dart';
 import 'dashboard.dart';
 import 'profile_screen.dart';
 
@@ -205,6 +206,14 @@ class _OverviewPageState extends State<OverviewPage> {
                   ),
                 ),
               );
+
+              // Refresh user data from Firebase after profile changes
+              final userData = await AuthService.getUserData();
+              if (userData != null && mounted) {
+                setState(() {
+                  userName = userData['username'] ?? userName;
+                });
+              }
 
               setState(() {
                 incubators = List<String>.from(incubatorData.keys);

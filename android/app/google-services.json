@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "99747883016",
+    "project_id": "hatchtech-7fba8",
+    "storage_bucket": "hatchtech-7fba8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:99747883016:android:cd94dd69c0ae3cbaae09bd",
+        "android_client_info": {
+          "package_name": "com.example.hatchtech"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "99747883016-c490d3j3tdh5kcfnjokitg16f440ea7s.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCezJCrgRrgKDSW_l5vn-XAh309Rlq4040"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "99747883016-c490d3j3tdh5kcfnjokitg16f440ea7s.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
