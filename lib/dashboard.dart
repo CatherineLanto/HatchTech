@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
 import 'profile_screen.dart';
+import 'services/auth_service.dart';
 
 class Dashboard extends StatefulWidget {
   final String incubatorName;
@@ -59,9 +60,50 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     if (widget.incubatorData != null && widget.incubatorData!.isNotEmpty) {
       incubatorData.addAll(widget.incubatorData!);
     } else {
+      final now = DateTime.now();
       incubatorData.addAll({
-        'Incubator 1': {'temperature': 37.5, 'humidity': 50.0, 'oxygen': 20.5, 'co2': 800.0, 'eggTurning': true, 'lighting': true},
-        'Incubator 2': {'temperature': 37.8, 'humidity': 55.0, 'oxygen': 20.0, 'co2': 750.0, 'eggTurning': false, 'lighting': false},
+        'Incubator 1': {
+          'temperature': 37.5, 
+          'humidity': 50.0, 
+          'oxygen': 20.5, 
+          'co2': 800.0, 
+          'eggTurning': true, 
+          'lighting': true,
+          'batchName': 'Batch A-001',
+          'startDate': now.subtract(const Duration(days: 12)).millisecondsSinceEpoch,
+          'incubationDays': 21,
+          'eggCount': 24,
+          'eggBreed': 'Rhode Island Red',
+          'candlingDates': {
+            '7': false,  // Day 7 candling done
+            '14': false, // Day 14 candling done
+            '18': false, // Day 18 candling done
+          },
+          'fertilityRate': null, // Percentage after first candling
+          'viableEggs': 24, // Current viable egg count
+          'hatchedCount': null, // Final hatched count
+        },
+        'Incubator 2': {
+          'temperature': 37.8, 
+          'humidity': 55.0, 
+          'oxygen': 20.0, 
+          'co2': 750.0, 
+          'eggTurning': false, 
+          'lighting': false,
+          'batchName': 'Batch B-002',
+          'startDate': now.subtract(const Duration(days: 7)).millisecondsSinceEpoch,
+          'incubationDays': 21,
+          'eggCount': 18,
+          'eggBreed': 'Leghorn',
+          'candlingDates': {
+            '7': true,   // Day 7 candling done
+            '14': false, // Day 14 candling done
+            '18': false, // Day 18 candling done
+          },
+          'fertilityRate': 85.0, // 85% fertility rate after day 7 candling
+          'viableEggs': 15, // 15 viable eggs remaining
+          'hatchedCount': null,
+        },
       });
     }
     
@@ -198,6 +240,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   void addNewIncubator() {
     int count = incubatorData.length + 1;
     String newName = 'Incubator $count';
+    final now = DateTime.now();
     incubatorData[newName] = {
       'temperature': 36.5 + Random().nextDouble() * 2,
       'humidity': 40 + Random().nextDouble() * 25,
@@ -205,6 +248,19 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       'co2': 700 + Random().nextDouble() * 400,
       'eggTurning': Random().nextBool(),
       'lighting': Random().nextBool(),
+      'batchName': 'Batch ${String.fromCharCode(65 + count - 1)}-${count.toString().padLeft(3, '0')}',
+      'startDate': now.millisecondsSinceEpoch,
+      'incubationDays': 21,
+      'eggCount': 12,
+      'eggBreed': 'Mixed',
+      'candlingDates': {
+        '7': false,
+        '14': false,
+        '18': false,
+      },
+      'fertilityRate': null,
+      'viableEggs': 12,
+      'hatchedCount': null,
     };
     setState(() {
       selectedIncubator = newName;
@@ -305,38 +361,49 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ProfileScreen(
-                    incubatorData: incubatorData,
-                    selectedIncubator: selectedIncubator,
-                    themeNotifier: widget.themeNotifier,
-                    userName: currentUserName,
+              await showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => DraggableScrollableSheet(
+                  initialChildSize: 0.9,
+                  minChildSize: 0.5,
+                  maxChildSize: 0.95,
+                  builder: (context, scrollController) => Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    child: ProfileScreen(
+                      incubatorData: incubatorData,
+                      selectedIncubator: selectedIncubator,
+                      themeNotifier: widget.themeNotifier,
+                      userName: currentUserName,
+                      onUserNameChanged: () async {
+                        // Refresh username from Firebase
+                        final user = AuthService.currentUser;
+                        if (user != null) {
+                          final newUserName = user.displayName ?? 'User';
+                          setState(() {
+                            currentUserName = newUserName;
+                          });
+                          widget.onUserNameChanged?.call(newUserName);
+                        }
+                      },
+                    ),
                   ),
                 ),
               );
 
-              if (result != null) {
-                if (result is String && result.isNotEmpty && result != currentUserName) {
-                  setState(() {
-                    currentUserName = result;
-                  });
-                  if (widget.onUserNameChanged != null) {
-                    widget.onUserNameChanged!(result);
-                  }
+              setState(() {
+                if (!incubatorData.containsKey(selectedIncubator)) {
+                  selectedIncubator = incubatorData.keys.first;
                 }
-                
-                setState(() {
-                  if (!incubatorData.containsKey(selectedIncubator)) {
-                    selectedIncubator = incubatorData.keys.first;
-                  }
-                  checkAlerts();
-                });
-                
-                if (widget.onDataChanged != null) {
-                  widget.onDataChanged!(Map.from(incubatorData));
-                }
+                checkAlerts();
+              });
+              
+              if (widget.onDataChanged != null) {
+                widget.onDataChanged!(Map.from(incubatorData));
               }
             },
           ),
@@ -412,26 +479,55 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                 ),
                 const SizedBox(height: 20),
                 Expanded(
-                  child: GridView.count(
-                    crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    children: [
-                      buildSensorCard('Temperature', selected['temperature'], Icons.thermostat, max: 40),
-                      buildSensorCard('Humidity', selected['humidity'], Icons.water_drop, max: 100),
-                      buildSensorCard('Oxygen', selected['oxygen'], Icons.air, max: 25),
-                      buildSensorCard('CO₂', selected['co2'], Icons.cloud, max: 1200),
-                      buildToggleCard('Egg Turning', selected['eggTurning'], (val) {
-                        setState(() {
-                          incubatorData[selectedIncubator]!['eggTurning'] = val;
-                        });
-                      }),
-                      buildToggleCard('Lighting', selected['lighting'], (val) {
-                        setState(() {
-                          incubatorData[selectedIncubator]!['lighting'] = val;
-                        });
-                      }),
-                    ],
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: [
+                        GridView.count(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 8,
+                          children: [
+                            buildSensorCard('Temperature', selected['temperature'], Icons.thermostat, max: 40),
+                            buildSensorCard('Humidity', selected['humidity'], Icons.water_drop, max: 100),
+                            buildSensorCard('Oxygen', selected['oxygen'], Icons.air, max: 25),
+                            buildSensorCard('CO₂', selected['co2'], Icons.cloud, max: 1200),
+                            buildToggleCard('Egg Turning', selected['eggTurning'], (val) {
+                              setState(() {
+                                incubatorData[selectedIncubator]!['eggTurning'] = val;
+                              });
+                            }),
+                            buildToggleCard('Lighting', selected['lighting'], (val) {
+                              setState(() {
+                                incubatorData[selectedIncubator]!['lighting'] = val;
+                              });
+                            }),
+                          ],
+                        ),
+                        const SizedBox(height: 2), 
+                        buildBatchTrackingCard(selected),
+                        const SizedBox(height: 12),
+                        // Start New Batch Button
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => showStartNewBatchDialog(context),
+                            icon: const Icon(Icons.add),
+                            label: const Text('Start New Batch'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF4CAF50),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16), 
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -576,6 +672,498 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
               color: iconColor.withValues(alpha: 0.8),
             ),
             child: Text(label),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget buildBatchTrackingCard(Map<String, dynamic> data) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    
+    // Get batch info with default values if not present
+    final String batchName = data['batchName'] ?? 'No batch';
+    final int startDateMs = data['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
+    final int incubationDays = data['incubationDays'] ?? 21;
+    
+    final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
+    final DateTime now = DateTime.now();
+    final Duration elapsed = now.difference(startDate);
+    final int daysElapsed = elapsed.inDays;
+    final int daysRemaining = (incubationDays - daysElapsed).clamp(0, incubationDays);
+    final double progress = (daysElapsed / incubationDays).clamp(0.0, 1.0);
+    
+    Color progressColor;
+    IconData batchIcon;
+    String statusText;
+    
+    if (daysRemaining == 0) {
+      progressColor = isDarkMode ? const Color(0xFF40C057) : Colors.green;
+      batchIcon = Icons.celebration;
+      statusText = 'Ready to hatch!';
+    } else if (daysRemaining <= 3) {
+      progressColor = isDarkMode ? const Color(0xFFFFB347) : Colors.orange;
+      batchIcon = Icons.schedule;
+      statusText = 'Hatching soon';
+    } else {
+      progressColor = isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue;
+      batchIcon = Icons.egg;
+      statusText = 'Incubating';
+    }
+
+    return GestureDetector(
+      onTap: () => showBatchDialog(context, data),
+      child: AnimatedContainer(
+        height: 85,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+        decoration: BoxDecoration(
+          color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: isDarkMode ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
+              blurRadius: 4,
+            ),
+          ],
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            // Icon
+            TweenAnimationBuilder<Color?>(
+              duration: const Duration(milliseconds: 500),
+              tween: ColorTween(begin: Colors.grey, end: progressColor),
+              builder: (context, color, child) {
+                return Icon(batchIcon, size: 36, color: color);
+              },
+            ),
+            const SizedBox(width: 16),
+            // Batch Information
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          batchName,
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                            color: progressColor,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: progressColor.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          'Day $daysElapsed/$incubationDays',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: progressColor,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  // Linear Progress Bar
+                  TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 800),
+                    tween: Tween(begin: 0.0, end: progress),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, animatedValue, child) {
+                      return LinearProgressIndicator(
+                        value: animatedValue,
+                        backgroundColor: isDarkMode 
+                            ? const Color(0xFF333333) 
+                            : Colors.grey[300],
+                        valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+                        minHeight: 6,
+                      );
+                    },
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        statusText,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: progressColor.withValues(alpha: 0.8),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      Text(
+                        daysRemaining > 0 ? '$daysRemaining days left' : 'Ready!',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: progressColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[400],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void showBatchDialog(BuildContext context, Map<String, dynamic> data) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final String batchName = data['batchName'] ?? 'No batch';
+    final int startDateMs = data['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
+    final int incubationDays = data['incubationDays'] ?? 21;
+    
+    final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
+    final DateTime expectedHatchDate = startDate.add(Duration(days: incubationDays));
+    final DateTime now = DateTime.now();
+    final Duration elapsed = now.difference(startDate);
+    final int daysElapsed = elapsed.inDays;
+    final int hoursElapsed = elapsed.inHours % 24;
+    final int daysRemaining = (incubationDays - daysElapsed).clamp(0, incubationDays);
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : null,
+        title: Row(
+          children: [
+            Icon(Icons.egg, color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Batch Details',
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDetailRow('Batch Name:', batchName, isDarkMode),
+            const SizedBox(height: 8),
+            _buildDetailRow('Egg Count:', '${data['eggCount'] ?? 0} eggs', isDarkMode),
+            const SizedBox(height: 8),
+            _buildDetailRow('Egg Breed:', data['eggBreed'] ?? 'Unknown', isDarkMode),
+            const SizedBox(height: 8),
+            _buildDetailRow('Started:', 
+              '${startDate.day}/${startDate.month}/${startDate.year}', isDarkMode),
+            const SizedBox(height: 8),
+            _buildDetailRow('Expected Hatch:', 
+              '${expectedHatchDate.day}/${expectedHatchDate.month}/${expectedHatchDate.year}', isDarkMode),
+            const SizedBox(height: 8),
+            _buildDetailRow('Time Elapsed:', 
+              '$daysElapsed days, $hoursElapsed hours', isDarkMode),
+            const SizedBox(height: 8),
+            _buildDetailRow('Days Remaining:', 
+              daysRemaining > 0 ? '$daysRemaining days' : 'Ready to hatch!', isDarkMode),
+            const SizedBox(height: 8),
+            _buildDetailRow('Incubation Period:', '$incubationDays days', isDarkMode),
+            const SizedBox(height: 16),
+            // Candling Section
+            Text(
+              'Candling Progress',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: isDarkMode ? Colors.white : Colors.black87,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _buildCandlingRow('Day 7:', data['candlingDates']['7'] ?? false, isDarkMode, 
+              onTap: () => showCandlingDialog(context, data)),
+            const SizedBox(height: 4),
+            _buildCandlingRow('Day 14:', data['candlingDates']['14'] ?? false, isDarkMode,
+              onTap: () => showCandlingDialog(context, data)),
+            const SizedBox(height: 4),
+            _buildCandlingRow('Day 18:', data['candlingDates']['18'] ?? false, isDarkMode,
+              onTap: () => showCandlingDialog(context, data)),
+            const SizedBox(height: 8),
+            if (data['fertilityRate'] != null)
+              _buildDetailRow('Fertility Rate:', '${data['fertilityRate'].toStringAsFixed(1)}%', isDarkMode),
+            if (data['fertilityRate'] != null)
+              const SizedBox(height: 8),
+            _buildDetailRow('Viable Eggs:', '${data['viableEggs'] ?? data['eggCount'] ?? 0}', isDarkMode),
+            const SizedBox(height: 8),
+            if (data['hatchedCount'] != null) ...[
+              _buildDetailRow('Hatched:', '${data['hatchedCount']}', isDarkMode),
+              const SizedBox(height: 8),
+              _buildDetailRow('Hatch Success Rate:', 
+                '${((data['hatchedCount'] / (data['eggCount'] ?? 1)) * 100).toStringAsFixed(1)}%', isDarkMode),
+              const SizedBox(height: 8),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+          if (daysRemaining == 0 && data['hatchedCount'] == null)
+            TextButton(
+              onPressed: () => showHatchResultDialog(context, data),
+              child: const Text('Record Hatch'),
+            ),
+          ElevatedButton(
+            onPressed: () => showEditBatchDialog(context, data),
+            child: const Text('Edit Batch'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value, bool isDarkMode) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 110,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[700],
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              color: isDarkMode ? Colors.white : Colors.black,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void showEditBatchDialog(BuildContext context, Map<String, dynamic> data) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final TextEditingController batchController = TextEditingController(text: data['batchName'] ?? '');
+    final TextEditingController daysController = TextEditingController(text: (data['incubationDays'] ?? 21).toString());
+    final TextEditingController eggCountController = TextEditingController(text: (data['eggCount'] ?? 0).toString());
+    final TextEditingController breedController = TextEditingController(text: data['eggBreed'] ?? '');
+    
+    Navigator.pop(context); // Close the details dialog first
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : null,
+        title: Text(
+          'Edit Batch Information',
+          style: TextStyle(color: isDarkMode ? Colors.white : null),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: batchController,
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+                decoration: InputDecoration(
+                  labelText: 'Batch Name',
+                  labelStyle: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : null),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: eggCountController,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+                decoration: InputDecoration(
+                  labelText: 'Number of Eggs',
+                  labelStyle: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : null),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: breedController,
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+                decoration: InputDecoration(
+                  labelText: 'Egg Breed/Type',
+                  labelStyle: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : null),
+                  hintText: 'e.g., Rhode Island Red, Leghorn',
+                  hintStyle: TextStyle(color: isDarkMode ? const Color(0xFF666666) : null),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: daysController,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+                decoration: InputDecoration(
+                  labelText: 'Incubation Days',
+                  labelStyle: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : null),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Close edit dialog
+              // Show batch details again
+              showBatchDialog(context, incubatorData[selectedIncubator]!);
+            },
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final String newBatchName = batchController.text.trim();
+              final int newDays = int.tryParse(daysController.text) ?? 21;
+              final int newEggCount = int.tryParse(eggCountController.text) ?? 0;
+              final String newBreed = breedController.text.trim();
+              
+              if (newBatchName.isNotEmpty && newDays > 0 && newEggCount >= 0) {
+                setState(() {
+                  incubatorData[selectedIncubator]!['batchName'] = newBatchName;
+                  incubatorData[selectedIncubator]!['incubationDays'] = newDays;
+                  incubatorData[selectedIncubator]!['eggCount'] = newEggCount;
+                  incubatorData[selectedIncubator]!['eggBreed'] = newBreed.isEmpty ? 'Unknown' : newBreed;
+                });
+                _notifyDataChanged();
+                Navigator.pop(context); // Close edit dialog
+                // Show batch details again
+                showBatchDialog(context, incubatorData[selectedIncubator]!);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void showStartNewBatchDialog(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final TextEditingController batchController = TextEditingController();
+    final TextEditingController eggCountController = TextEditingController(text: '12');
+    final TextEditingController breedController = TextEditingController();
+    final TextEditingController daysController = TextEditingController(text: '21');
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : null,
+        title: Text(
+          'Start New Batch',
+          style: TextStyle(color: isDarkMode ? Colors.white : null),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: batchController,
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+                decoration: InputDecoration(
+                  labelText: 'Batch Name *',
+                  labelStyle: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : null),
+                  hintText: 'e.g., Spring Batch 2024',
+                  hintStyle: TextStyle(color: isDarkMode ? const Color(0xFF666666) : null),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: eggCountController,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+                decoration: InputDecoration(
+                  labelText: 'Number of Eggs *',
+                  labelStyle: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : null),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: breedController,
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+                decoration: InputDecoration(
+                  labelText: 'Egg Breed/Type',
+                  labelStyle: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : null),
+                  hintText: 'e.g., Rhode Island Red, Leghorn',
+                  hintStyle: TextStyle(color: isDarkMode ? const Color(0xFF666666) : null),
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: daysController,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+                decoration: InputDecoration(
+                  labelText: 'Incubation Days',
+                  labelStyle: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : null),
+                  hintText: '21 for chickens, 28 for ducks',
+                  hintStyle: TextStyle(color: isDarkMode ? const Color(0xFF666666) : null),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final String batchName = batchController.text.trim();
+              final int eggCount = int.tryParse(eggCountController.text) ?? 0;
+              final String breed = breedController.text.trim();
+              final int days = int.tryParse(daysController.text) ?? 21;
+              
+              if (batchName.isNotEmpty && eggCount > 0) {
+                setState(() {
+                  incubatorData[selectedIncubator]!['batchName'] = batchName;
+                  incubatorData[selectedIncubator]!['eggCount'] = eggCount;
+                  incubatorData[selectedIncubator]!['eggBreed'] = breed.isEmpty ? 'Mixed' : breed;
+                  incubatorData[selectedIncubator]!['incubationDays'] = days;
+                  incubatorData[selectedIncubator]!['startDate'] = DateTime.now().millisecondsSinceEpoch;
+                  incubatorData[selectedIncubator]!['viableEggs'] = eggCount; // Start with all eggs viable
+                  incubatorData[selectedIncubator]!['candlingDates'] = {
+                    '7': false,
+                    '14': false,
+                    '18': false,
+                  };
+                  incubatorData[selectedIncubator]!['fertilityRate'] = null;
+                  incubatorData[selectedIncubator]!['hatchedCount'] = null;
+                });
+                _notifyDataChanged();
+                Navigator.pop(context);
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF4CAF50),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Start Batch'),
           ),
         ],
       ),
@@ -769,6 +1357,387 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCandlingRow(String label, bool isDone, bool isDarkMode, {VoidCallback? onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(6),
+          color: onTap != null ? (isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[100]) : Colors.transparent,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                fontSize: 14,
+              ),
+            ),
+            Row(
+              children: [
+                Icon(
+                  isDone ? Icons.check_circle : Icons.radio_button_unchecked,
+                  color: isDone 
+                      ? (isDarkMode ? const Color(0xFF40C057) : Colors.green)
+                      : (isDarkMode ? const Color(0xFF666666) : Colors.grey),
+                  size: 18,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void showCandlingDialog(BuildContext context, Map<String, dynamic> data) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final int daysElapsed = DateTime.now().difference(
+      DateTime.fromMillisecondsSinceEpoch(data['startDate'] ?? DateTime.now().millisecondsSinceEpoch)
+    ).inDays;
+    
+    // Determine which candling days are available
+    final List<int> availableDays = [7, 14, 18].where((day) => daysElapsed >= day).toList();
+    final TextEditingController viableEggController = TextEditingController(
+      text: (data['viableEggs'] ?? data['eggCount'] ?? 0).toString()
+    );
+    
+    Navigator.pop(context); // Close the details dialog
+    
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+            title: Text(
+              'Candling Progress',
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Mark completed candling days and update viable egg count:',
+                    style: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600]),
+                  ),
+                  const SizedBox(height: 16),
+                  ...availableDays.map((day) {
+                    final bool currentStatus = data['candlingDates']['$day'] ?? false;
+                    return CheckboxListTile(
+                      title: Text(
+                        'Day $day Candling',
+                        style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                      ),
+                      value: currentStatus,
+                      activeColor: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue,
+                      checkColor: Colors.white,
+                      onChanged: (bool? value) {
+                        setDialogState(() {
+                          data['candlingDates']['$day'] = value ?? false;
+                          // Calculate fertility rate if first candling is done
+                          if (day == 7 && value == true && data['fertilityRate'] == null) {
+                            final viableCount = int.tryParse(viableEggController.text) ?? (data['viableEggs'] ?? data['eggCount'] ?? 0);
+                            data['fertilityRate'] = ((viableCount / (data['eggCount'] ?? 1)) * 100);
+                          }
+                        });
+                      },
+                    );
+                  }),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: viableEggController,
+                    keyboardType: TextInputType.number,
+                    style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                    decoration: InputDecoration(
+                      labelText: 'Viable Eggs Remaining',
+                      labelStyle: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600]),
+                      hintText: 'Update count after candling',
+                      hintStyle: TextStyle(color: isDarkMode ? const Color(0xFF666666) : Colors.grey[400]),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: isDarkMode ? const Color(0xFF444444) : Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide(color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      final int viableCount = int.tryParse(value) ?? 0;
+                      setDialogState(() {
+                        data['viableEggs'] = viableCount;
+                        // Update fertility rate if day 7 candling is done
+                        if (data['candlingDates']['7'] == true) {
+                          data['fertilityRate'] = ((viableCount / (data['eggCount'] ?? 1)) * 100);
+                        }
+                      });
+                    },
+                  ),
+                  if (data['fertilityRate'] != null) ...[
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[100],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline,
+                            color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Fertility Rate: ${data['fertilityRate'].toStringAsFixed(1)}%',
+                              style: TextStyle(
+                                color: isDarkMode ? Colors.white : Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context); // Close candling dialog
+                  // Show batch details again
+                  showBatchDialog(context, incubatorData[selectedIncubator]!);
+                },
+                child: Text(
+                  'Cancel',
+                  style: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600]),
+                ),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    // Ensure candling data is properly saved to the main incubator data
+                    final String incubatorKey = selectedIncubator;
+                    if (incubatorData.containsKey(incubatorKey)) {
+                      // Update the main data structure with any changes made in the dialog
+                      incubatorData[incubatorKey]!['candlingDates'] = Map<String, dynamic>.from(data['candlingDates'] ?? {});
+                      if (data['fertilityRate'] != null) {
+                        incubatorData[incubatorKey]!['fertilityRate'] = data['fertilityRate'];
+                      }
+                      if (data['viableEggs'] != null) {
+                        incubatorData[incubatorKey]!['viableEggs'] = data['viableEggs'];
+                      }
+                    }
+                    _notifyDataChanged();
+                  });
+                  Navigator.pop(context); // Close candling dialog
+                  // Show batch details again
+                  showBatchDialog(context, incubatorData[selectedIncubator]!);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('Candling progress saved!'),
+                      backgroundColor: Colors.green,
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Save'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void showHatchResultDialog(BuildContext context, Map<String, dynamic> data) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final TextEditingController hatchedController = TextEditingController();
+    
+    Navigator.pop(context); // Close the details dialog
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+        title: Row(
+          children: [
+            Icon(
+              Icons.celebration,
+              color: isDarkMode ? const Color(0xFF40C057) : Colors.green,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Record Hatch Results',
+              style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Congratulations! Your batch is ready to hatch.',
+                style: TextStyle(
+                  color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                  fontSize: 16,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Initial eggs:',
+                          style: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600]),
+                        ),
+                        Text(
+                          '${data['eggCount'] ?? 0}',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Viable before hatch:',
+                          style: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600]),
+                        ),
+                        Text(
+                          '${data['viableEggs'] ?? data['eggCount'] ?? 0}',
+                          style: TextStyle(
+                            color: isDarkMode ? Colors.white : Colors.black,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: hatchedController,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : Colors.black),
+                decoration: InputDecoration(
+                  labelText: 'Successfully Hatched *',
+                  labelStyle: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600]),
+                  hintText: 'Number of chicks hatched',
+                  hintStyle: TextStyle(color: isDarkMode ? const Color(0xFF666666) : Colors.grey[400]),
+                  prefixIcon: Icon(
+                    Icons.egg_alt,
+                    color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: isDarkMode ? const Color(0xFF444444) : Colors.grey[300]!),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: isDarkMode ? const Color(0xFF40C057) : Colors.green),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Close hatch dialog
+              // Show batch details again
+              showBatchDialog(context, incubatorData[selectedIncubator]!);
+            },
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final int hatchedCount = int.tryParse(hatchedController.text) ?? 0;
+              final int viableEggs = data['viableEggs'] ?? data['eggCount'] ?? 1;
+              
+              if (hatchedCount >= 0 && hatchedCount <= viableEggs) {
+                setState(() {
+                  data['hatchedCount'] = hatchedCount;
+                });
+                _notifyDataChanged();
+                Navigator.pop(context); // Close hatch dialog
+                
+                // Show batch details again
+                showBatchDialog(context, incubatorData[selectedIncubator]!);
+                
+                // Calculate success rate for the message
+                final double successRate = (hatchedCount / (data['eggCount'] ?? 1)) * 100;
+                
+                // Show success message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      'Batch completed! $hatchedCount chicks hatched (${successRate.toStringAsFixed(1)}% success rate)',
+                    ),
+                    backgroundColor: Colors.green,
+                    behavior: SnackBarBehavior.floating,
+                    duration: const Duration(seconds: 4),
+                  ),
+                );
+              } else if (hatchedCount > viableEggs) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Cannot hatch more than $viableEggs viable eggs'),
+                    backgroundColor: Colors.orange,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDarkMode ? const Color(0xFF40C057) : Colors.green,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
     );
   }
 }

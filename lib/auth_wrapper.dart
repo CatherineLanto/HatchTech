@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'login_screen.dart';
-import 'overview_screen.dart';
+import 'main_navigation.dart';
 import 'services/auth_service.dart';
 
 class AuthWrapper extends StatelessWidget {
@@ -25,8 +25,8 @@ class AuthWrapper extends StatelessWidget {
         
         // If user is logged in
         if (snapshot.hasData) {
-          return FutureBuilder<Map<String, dynamic>?>(
-            future: AuthService.getUserData(),
+          return StreamBuilder<Map<String, dynamic>?>(
+            stream: AuthService.getUserDataStream(),
             builder: (context, userDataSnapshot) {
               if (userDataSnapshot.connectionState == ConnectionState.waiting) {
                 return const Scaffold(
@@ -37,7 +37,7 @@ class AuthWrapper extends StatelessWidget {
               }
               
               final username = userDataSnapshot.data?['username'] ?? 'User';
-              return OverviewPage(
+              return MainNavigation(
                 userName: username,
                 themeNotifier: themeNotifier,
               );

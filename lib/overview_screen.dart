@@ -2,17 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'services/auth_service.dart';
-import 'dashboard.dart';
 import 'profile_screen.dart';
 
 class OverviewPage extends StatefulWidget {
   final String userName;
   final ValueNotifier<ThemeMode> themeNotifier;
+  final Map<String, Map<String, dynamic>>? sharedIncubatorData;
+  final Function(Map<String, Map<String, dynamic>>)? onDataChanged;
+  final Function(String)? onUserNameChanged;
+  final Function(String)? onNavigateToDashboard;
+  final VoidCallback? onNavigateToAnalytics;
 
   const OverviewPage({
     super.key,
     required this.userName,
     required this.themeNotifier,
+    this.sharedIncubatorData,
+    this.onDataChanged,
+    this.onUserNameChanged,
+    this.onNavigateToDashboard,
+    this.onNavigateToAnalytics,
   });
 
   @override
@@ -21,6 +30,7 @@ class OverviewPage extends StatefulWidget {
 
 class _OverviewPageState extends State<OverviewPage> {
   late String userName;
+  bool isNewUser = false;
   int normalCount = 0;
   int warningCount = 0;
   List<String> incubators = ['Incubator 1', 'Incubator 2'];
@@ -32,7 +42,10 @@ class _OverviewPageState extends State<OverviewPage> {
       'oxygen': 20.5,      
       'co2': 800.0,      
       'eggTurning': true,
-      'lighting': true
+      'lighting': true,
+      'batchName': 'Batch A-001',
+      'startDate': DateTime.now().subtract(const Duration(days: 12)).millisecondsSinceEpoch,
+      'incubationDays': 21,
     },
     'Incubator 2': {
       'temperature': 37.8, 
@@ -40,7 +53,10 @@ class _OverviewPageState extends State<OverviewPage> {
       'oxygen': 20.0,     
       'co2': 750.0,       
       'eggTurning': false,
-      'lighting': false
+      'lighting': false,
+      'batchName': 'Batch B-002',
+      'startDate': DateTime.now().subtract(const Duration(days: 7)).millisecondsSinceEpoch,
+      'incubationDays': 21,
     },
   };
 
@@ -52,12 +68,51 @@ class _OverviewPageState extends State<OverviewPage> {
   void initState() {
     super.initState();
     userName = widget.userName;
-    _loadUserData();
+    
+    // Use shared data if available, otherwise load from preferences
+    if (widget.sharedIncubatorData != null && widget.sharedIncubatorData!.isNotEmpty) {
+      setState(() {
+        incubatorData = Map.from(widget.sharedIncubatorData!);
+        incubators = incubatorData.keys.toList();
+      });
+      _updateCounts();
+    } else {
+      _loadUserData();
+    }
+    
+    // Load the latest username from Firebase to ensure it's current
+    _loadFirebaseUserData();
   }
 
   @override
   void dispose() {
     super.dispose();
+  }
+
+  Future<void> _loadFirebaseUserData() async {
+    try {
+      final userData = await AuthService.getUserData();
+      if (userData != null && mounted) {
+        final firebaseUsername = userData['username'];
+        if (firebaseUsername != null && firebaseUsername != userName) {
+          setState(() {
+            userName = firebaseUsername;
+          });
+          // Notify parent about username change
+          widget.onUserNameChanged?.call(userName);
+        }
+      }
+
+      // Check if user is new
+      final userIsNew = await AuthService.isNewUser();
+      if (mounted) {
+        setState(() {
+          isNewUser = userIsNew;
+        });
+      }
+    } catch (e) {
+      // Handle error silently - keep the existing username
+    }
   }
 
   void updateIncubatorData(Map<String, Map<String, dynamic>> newData) {
@@ -68,6 +123,11 @@ class _OverviewPageState extends State<OverviewPage> {
         _updateCounts();
       });
       _saveUserData();
+      
+      // Notify parent widget about data changes
+      if (widget.onDataChanged != null) {
+        widget.onDataChanged!(Map.from(incubatorData));
+      }
     }
   }
 
@@ -115,13 +175,8 @@ class _OverviewPageState extends State<OverviewPage> {
     final currentUser = prefs.getString('current_user') ?? '';
     
     if (currentUser.isNotEmpty) {
-      final savedUsername = prefs.getString('user_name_$currentUser');
-      if (savedUsername != null) {
-        setState(() {
-          userName = savedUsername;
-        });
-      }
-      
+      // Don't override userName from SharedPreferences - use Firebase data instead
+      // Only load incubator data from SharedPreferences
       final savedData = prefs.getString('incubator_data_$currentUser');
       if (savedData != null) {
         try {
@@ -144,6 +199,7 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
   void _initializeDefaultData() {
+    final now = DateTime.now();
     setState(() {
       incubatorData = {
         'Incubator 1': {
@@ -152,7 +208,10 @@ class _OverviewPageState extends State<OverviewPage> {
           'oxygen': 20.5,
           'co2': 800.0,
           'eggTurning': true,
-          'lighting': true
+          'lighting': true,
+          'batchName': 'Batch A-001',
+          'startDate': now.subtract(const Duration(days: 12)).millisecondsSinceEpoch,
+          'incubationDays': 21,
         },
         'Incubator 2': {
           'temperature': 37.8,
@@ -160,7 +219,10 @@ class _OverviewPageState extends State<OverviewPage> {
           'oxygen': 20.0,
           'co2': 750.0,
           'eggTurning': false,
-          'lighting': false
+          'lighting': false,
+          'batchName': 'Batch B-002',
+          'startDate': now.subtract(const Duration(days: 7)).millisecondsSinceEpoch,
+          'incubationDays': 21,
         },
       };
       incubators = incubatorData.keys.toList();
@@ -180,6 +242,36 @@ class _OverviewPageState extends State<OverviewPage> {
     }
   }
 
+  String _getBatchSummary(String incubatorName) {
+    final data = incubatorData[incubatorName];
+    if (data == null) return 'No batch info';
+    
+    final String batchName = data['batchName'] ?? 'No batch';
+    return batchName;
+  }
+
+  String _getDaysRemaining(String incubatorName) {
+    final data = incubatorData[incubatorName];
+    if (data == null) return '';
+    
+    final int startDateMs = data['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
+    final int incubationDays = data['incubationDays'] ?? 21;
+    
+    final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
+    final DateTime now = DateTime.now();
+    final Duration elapsed = now.difference(startDate);
+    final int daysElapsed = elapsed.inDays;
+    final int daysRemaining = (incubationDays - daysElapsed).clamp(0, incubationDays);
+    
+    if (daysRemaining == 0) {
+      return 'Ready to hatch!';
+    } else if (daysRemaining == 1) {
+      return '1 day left';
+    } else {
+      return '$daysRemaining days left';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -194,38 +286,45 @@ class _OverviewPageState extends State<OverviewPage> {
           IconButton(
             icon: const Icon(Icons.person),
             onPressed: () async {
-              final result = await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => ProfileScreen(
-                    incubatorData: incubatorData,
-                    selectedIncubator:
-                        incubators.isNotEmpty ? incubators.first : '',
-                    themeNotifier: widget.themeNotifier,
-                    userName: userName,
+              await showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => DraggableScrollableSheet(
+                  initialChildSize: 0.9,
+                  minChildSize: 0.5,
+                  maxChildSize: 0.95,
+                  builder: (context, scrollController) => Container(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    child: ProfileScreen(
+                      incubatorData: incubatorData,
+                      selectedIncubator:
+                          incubators.isNotEmpty ? incubators.first : '',
+                      themeNotifier: widget.themeNotifier,
+                      userName: userName,
+                      onUserNameChanged: () async {
+                        // Refresh user data from Firebase
+                        final userData = await AuthService.getUserData();
+                        if (userData != null && mounted) {
+                          setState(() {
+                            userName = userData['username'] ?? userName;
+                          });
+                          // Notify parent about username change
+                          widget.onUserNameChanged?.call(userName);
+                        }
+                      },
+                    ),
                   ),
                 ),
               );
-
-              // Refresh user data from Firebase after profile changes
-              final userData = await AuthService.getUserData();
-              if (userData != null && mounted) {
-                setState(() {
-                  userName = userData['username'] ?? userName;
-                });
-              }
 
               setState(() {
                 incubators = List<String>.from(incubatorData.keys);
                 _updateCounts();
               });
-              
-              if (result is String && result.isNotEmpty) {
-                setState(() {
-                  userName = result;
-                });
-                _saveUserData();
-              }
             },
           ),
         ],
@@ -234,12 +333,16 @@ class _OverviewPageState extends State<OverviewPage> {
         padding: const EdgeInsets.all(16.0),
         children: [
           Text(
-            "Welcome back, $userName!",
+            isNewUser ? "Welcome, $userName!" : "Welcome back, $userName!",
             style: Theme.of(context)
                 .textTheme
                 .headlineSmall
                 ?.copyWith(fontWeight: FontWeight.bold),
           ),
+          const SizedBox(height: 20),
+
+          // Analytics Summary Card
+          _buildAnalyticsSummaryCard(isDarkMode),
           const SizedBox(height: 20),
 
           Text(
@@ -297,40 +400,9 @@ class _OverviewPageState extends State<OverviewPage> {
                           duration: Duration(milliseconds: 300 + (index * 100)),
                           curve: Curves.easeOutBack,
                           child: GestureDetector(
-                            onTap: () async {
-                              await Navigator.push(
-                                context,
-                                PageRouteBuilder(
-                                  pageBuilder: (context, animation, secondaryAnimation) => Dashboard(
-                                    incubatorName: name,
-                                    userName: userName,
-                                    themeNotifier: widget.themeNotifier,
-                                    incubatorData: incubatorData,
-                                    onDataChanged: updateIncubatorData,
-                                    onUserNameChanged: (newUserName) {
-                                      setState(() {
-                                        userName = newUserName;
-                                      });
-                                      _saveUserData();
-                                    },
-                                  ),
-                                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                                    return SlideTransition(
-                                      position: Tween<Offset>(
-                                        begin: const Offset(1.0, 0.0),
-                                        end: Offset.zero,
-                                      ).animate(CurvedAnimation(
-                                        parent: animation,
-                                        curve: Curves.easeInOut,
-                                      )),
-                                      child: child,
-                                    );
-                                  },
-                                ),
-                              );
-                              
-                              if (mounted) {
-                                _updateCounts();
+                            onTap: () {
+                              if (widget.onNavigateToDashboard != null) {
+                                widget.onNavigateToDashboard!(name);
                               }
                             },
                             child: Container(
@@ -352,22 +424,48 @@ class _OverviewPageState extends State<OverviewPage> {
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
-                                    child: Text(
-                                      name,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        color: isDarkMode ? const Color(0xFF40C057) : Colors.green.shade700,
-                                        fontSize: 15,
-                                      ),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          name,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: isDarkMode ? const Color(0xFF40C057) : Colors.green.shade700,
+                                            fontSize: 15,
+                                          ),
+                                        ),
+                                        Text(
+                                          _getBatchSummary(name),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: isDarkMode ? const Color(0xFF51CF66) : Colors.green.shade600,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
-                                  Text(
-                                    "All systems normal",
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: isDarkMode ? const Color(0xFF51CF66) : Colors.green.shade600,
-                                      fontStyle: FontStyle.italic,
-                                    ),
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        "All systems normal",
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isDarkMode ? const Color(0xFF51CF66) : Colors.green.shade600,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                      ),
+                                      Text(
+                                        _getDaysRemaining(name),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: isDarkMode ? const Color(0xFF69DB7C) : Colors.green.shade500,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                   const SizedBox(width: 8),
                                   Icon(
@@ -406,28 +504,9 @@ class _OverviewPageState extends State<OverviewPage> {
             ),
             const SizedBox(height: 10),
             ...warningIncubators.map((incubator) => GestureDetector(
-                  onTap: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => Dashboard(
-                          incubatorName: incubator,
-                          userName: userName,
-                          themeNotifier: widget.themeNotifier,
-                          incubatorData: incubatorData,
-                          onDataChanged: updateIncubatorData,
-                          onUserNameChanged: (newUserName) {
-                            setState(() {
-                              userName = newUserName;
-                            });
-                            _saveUserData();
-                          },
-                        ),
-                      ),
-                    );
-                    
-                    if (mounted) {
-                      _updateCounts();
+                  onTap: () {
+                    if (widget.onNavigateToDashboard != null) {
+                      widget.onNavigateToDashboard!(incubator);
                     }
                   },
                   child: Card(
@@ -443,10 +522,32 @@ class _OverviewPageState extends State<OverviewPage> {
                             child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          incubator,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                      Text(
+                                        _getDaysRemaining(incubator),
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: isDarkMode ? const Color(0xFFFF8C42) : Colors.orange.shade600,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                   Text(
-                                    incubator,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold),
+                                    _getBatchSummary(incubator),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: isDarkMode ? const Color(0xFFFFB347) : Colors.orange.shade700,
+                                      fontStyle: FontStyle.italic,
+                                    ),
                                   ),
                                   const SizedBox(height: 6),
                                   ...warningDetails[incubator]!.map((issue) =>
@@ -510,50 +611,138 @@ class _OverviewPageState extends State<OverviewPage> {
               ),
             ),
           ],
-
-          const SizedBox(height: 30),
-
-          const Text(
-            "Incubators",
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-
-          ...incubators.map((incubator) => Card(
-                color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.grey.shade100,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10)),
-                child: ListTile(
-                  title: Text(incubator),
-                  trailing: const Icon(Icons.arrow_forward_ios),
-                  onTap: () async {
-                    await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => Dashboard(
-                          incubatorName: incubator,
-                          userName: userName,
-                          themeNotifier: widget.themeNotifier,
-                          incubatorData: incubatorData,
-                          onDataChanged: updateIncubatorData,
-                          onUserNameChanged: (newUserName) {
-                            setState(() {
-                              userName = newUserName;
-                            });
-                            _saveUserData();
-                          },
-                        ),
-                      ),
-                    );
-                    
-                    if (mounted) {
-                      _updateCounts();
-                    }
-                  },
-                ),
-              )),
         ],
       ),
+    );
+  }
+
+  Widget _buildAnalyticsSummaryCard(bool isDarkMode) {
+    // Calculate next candling date from active batches
+    String nextCandlingDate = 'No active batches';
+    incubatorData.forEach((name, data) {
+      final int startDateMs = data['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
+      final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
+      final DateTime now = DateTime.now();
+      final int daysElapsed = now.difference(startDate).inDays;
+      
+      // Check for next candling day (7, 14, 18)
+      for (int day in [7, 14, 18]) {
+        if (daysElapsed < day) {
+          final DateTime candlingDate = startDate.add(Duration(days: day));
+          nextCandlingDate = '${candlingDate.day}/${candlingDate.month}/${candlingDate.year}';
+          break;
+        }
+      }
+    });
+
+    return Card(
+      color: isDarkMode ? const Color(0xFF0F1B2D) : Colors.blue.shade50,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.analytics,
+                  color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue.shade600,
+                  size: 28,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  'Analytics Summary',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue.shade700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: _buildQuickStat(
+                    'Hatch Rate',
+                    '85.5%',
+                    Icons.trending_up,
+                    Colors.green,
+                    isDarkMode,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildQuickStat(
+                    'Active Batches',
+                    '${incubatorData.length}',
+                    Icons.egg,
+                    Colors.orange,
+                    isDarkMode,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _buildQuickStat(
+                    'Next Candling',
+                    nextCandlingDate == 'No active batches' ? 'N/A' : nextCandlingDate,
+                    Icons.visibility,
+                    Colors.purple,
+                    isDarkMode,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  widget.onNavigateToAnalytics?.call();
+                },
+                icon: const Icon(Icons.analytics, size: 18),
+                label: const Text('View Detailed Analytics'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue.shade600,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickStat(String label, String value, IconData icon, Color color, bool isDarkMode) {
+    return Column(
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 14,
+            color: color,
+          ),
+          textAlign: TextAlign.center,
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
     );
   }
 }

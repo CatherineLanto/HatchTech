@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
 import 'login_screen.dart';
-import 'overview_screen.dart';
 
 class SignUpScreen extends StatefulWidget {
   final ValueNotifier<ThemeMode> themeNotifier;
@@ -111,15 +110,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.pop(context);
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => OverviewPage(
-                            userName: _username.text.trim(),
-                            themeNotifier: widget.themeNotifier,
-                          ),
-                        ),
-                      );
+                      // AuthWrapper will automatically handle navigation to MainNavigation
+                      // when it detects the user is signed in
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueAccent,
@@ -191,17 +183,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
       username: _username.text.trim(),
     );
 
-    setState(() {
-      isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        isLoading = false;
+      });
+    }
 
     if (result['success']) {
       _showSuccessDialog();
     } else {
-      setState(() {
-        hasError = true;
-        errorMessage = result['message'];
-      });
+      if (mounted) {
+        setState(() {
+          hasError = true;
+          errorMessage = result['message'];
+        });
+      }
     }
   }
 

@@ -186,6 +186,19 @@ class AuthService {
     }
   }
 
+  // Stream user data changes
+  static Stream<Map<String, dynamic>?> getUserDataStream() {
+    if (currentUser == null) {
+      return Stream.value(null);
+    }
+
+    return _firestore
+        .collection('users')
+        .doc(currentUser!.uid)
+        .snapshots()
+        .map((doc) => doc.exists ? doc.data() : null);
+  }
+
   // Update user profile (username only)
   static Future<Map<String, dynamic>> updateUserProfile({
     required String username,
@@ -240,4 +253,26 @@ class AuthService {
 
   // Check if user is logged in
   static bool get isLoggedIn => currentUser != null;
+
+  // Check if user is new (created account within last 5 minutes)
+  static Future<bool> isNewUser() async {
+    if (currentUser == null) return false;
+
+    try {
+      final userData = await getUserData();
+      if (userData == null) return false;
+
+      final createdAt = userData['created_at'] as Timestamp?;
+      if (createdAt == null) return false;
+
+      final now = DateTime.now();
+      final accountCreated = createdAt.toDate();
+      final difference = now.difference(accountCreated);
+
+      // Consider user "new" if account was created within last 5 minutes
+      return difference.inMinutes <= 5;
+    } catch (e) {
+      return false;
+    }
+  }
 }

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hatchtech/login_screen.dart';
 import 'services/auth_service.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -7,6 +6,7 @@ class ProfileScreen extends StatefulWidget {
   final String selectedIncubator;
   final ValueNotifier<ThemeMode> themeNotifier;
   final String userName;
+  final VoidCallback? onUserNameChanged;
 
   const ProfileScreen({
     super.key,
@@ -14,6 +14,7 @@ class ProfileScreen extends StatefulWidget {
     required this.selectedIncubator,
     required this.themeNotifier,
     required this.userName,
+    this.onUserNameChanged,
   });
 
   @override
@@ -87,6 +88,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             originalLoginName = newUsername;
             _isEditing = false;
           });
+
+          // Notify parent about username change
+          widget.onUserNameChanged?.call();
 
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -315,16 +319,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   await AuthService.signOut();
                   
                   if (mounted) {
-                    // Navigation will be handled automatically by AuthWrapper
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => LoginScreen(
-                          themeNotifier: widget.themeNotifier,
-                        ),
-                      ),
-                      (route) => false,
-                    );
+                    // Close the profile modal/screen first
+                    Navigator.of(context).pop();
+                    // AuthWrapper will automatically handle the navigation to LoginScreen
+                    // when it detects the user is signed out
                   }
                 },
               ),

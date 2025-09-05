@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
-import 'overview_screen.dart';
 import 'signup_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -40,7 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _clearError() {
-    if (isLoginFailed) {
+    if (isLoginFailed && mounted) {
       setState(() {
         isLoginFailed = false;
         errorMessage = null;
@@ -53,18 +52,22 @@ class _LoginScreenState extends State<LoginScreen> {
     final inputPassword = _passwordController.text.trim();
 
     if (inputUsername.isEmpty || inputPassword.isEmpty) {
-      setState(() {
-        isLoginFailed = true;
-        errorMessage = "Please fill in all fields";
-      });
+      if (mounted) {
+        setState(() {
+          isLoginFailed = true;
+          errorMessage = "Please fill in all fields";
+        });
+      }
       return;
     }
 
-    setState(() {
-      isLoading = true;
-      isLoginFailed = false;
-      errorMessage = null;
-    });
+    if (mounted) {
+      setState(() {
+        isLoading = true;
+        isLoginFailed = false;
+        errorMessage = null;
+      });
+    }
 
     Map<String, dynamic> result;
 
@@ -83,29 +86,22 @@ class _LoginScreenState extends State<LoginScreen> {
       );
     }
 
-    setState(() {
-      isLoading = false;
-    });
+    if (mounted) {
+      setState(() {
+        isLoading = false;
+      });
+    }
 
     if (result['success']) {
-      // Get user data from Firestore
-      final userData = await AuthService.getUserData();
-      final username = userData?['username'] ?? 'User';
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => OverviewPage(
-            userName: username,
-            themeNotifier: widget.themeNotifier,
-          ),
-        ),
-      );
+      // AuthWrapper will automatically handle navigation to MainNavigation
+      // when it detects the user is signed in
     } else {
-      setState(() {
-        isLoginFailed = true;
-        errorMessage = result['message'];
-      });
+      if (mounted) {
+        setState(() {
+          isLoginFailed = true;
+          errorMessage = result['message'];
+        });
+      }
     }
   }
 
