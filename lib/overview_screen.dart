@@ -71,7 +71,6 @@ class _OverviewPageState extends State<OverviewPage> {
     super.initState();
     userName = widget.userName;
     
-    // Use shared data if available, otherwise load from preferences
     if (widget.sharedIncubatorData != null && widget.sharedIncubatorData!.isNotEmpty) {
       setState(() {
         incubatorData = Map.from(widget.sharedIncubatorData!);
@@ -82,7 +81,6 @@ class _OverviewPageState extends State<OverviewPage> {
       _loadUserData();
     }
     
-    // Load the latest username from Firebase to ensure it's current
     _loadFirebaseUserData();
   }
 
@@ -95,7 +93,6 @@ class _OverviewPageState extends State<OverviewPage> {
   void didUpdateWidget(OverviewPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     
-    // Check if shared incubator data has changed
     if (widget.sharedIncubatorData != oldWidget.sharedIncubatorData) {
       debugPrint('OverviewScreen: Shared incubator data updated');
       if (widget.sharedIncubatorData != null && widget.sharedIncubatorData!.isNotEmpty) {
@@ -108,7 +105,6 @@ class _OverviewPageState extends State<OverviewPage> {
     }
   }
 
-  // Helper method to get the current data source (shared or local)
   Map<String, Map<String, dynamic>> get _currentIncubatorData {
     return widget.sharedIncubatorData ?? incubatorData;
   }
@@ -122,7 +118,6 @@ class _OverviewPageState extends State<OverviewPage> {
           setState(() {
             userName = firebaseUsername;
           });
-          // Notify parent about username change
           widget.onUserNameChanged?.call(userName);
         }
       }
@@ -135,7 +130,7 @@ class _OverviewPageState extends State<OverviewPage> {
         });
       }
     } catch (e) {
-      // Handle error silently - keep the existing username
+      // Handle error silently - keep existing username
     }
   }
 
@@ -148,7 +143,6 @@ class _OverviewPageState extends State<OverviewPage> {
       });
       _saveUserData();
       
-      // Notify parent widget about data changes
       if (widget.onDataChanged != null) {
         widget.onDataChanged!(Map.from(incubatorData));
       }
@@ -199,8 +193,6 @@ class _OverviewPageState extends State<OverviewPage> {
     final currentUser = prefs.getString('current_user') ?? '';
     
     if (currentUser.isNotEmpty) {
-      // Don't override userName from SharedPreferences - use Firebase data instead
-      // Only load incubator data from SharedPreferences
       final savedData = prefs.getString('incubator_data_$currentUser');
       if (savedData != null) {
         try {
@@ -336,7 +328,6 @@ class _OverviewPageState extends State<OverviewPage> {
                           setState(() {
                             userName = userData['username'] ?? userName;
                           });
-                          // Notify parent about username change
                           widget.onUserNameChanged?.call(userName);
                         }
                       },
@@ -641,7 +632,6 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
   Widget _buildAnalyticsSummaryCard(bool isDarkMode) {
-    // Use shared data if available, otherwise fall back to hardcoded
     final dataSource = widget.sharedIncubatorData ?? incubatorData;
     final batchHistoryData = widget.batchHistory ?? [];
     
@@ -652,7 +642,7 @@ class _OverviewPageState extends State<OverviewPage> {
         batch['reason'] != null && batch['reason'].toString().toLowerCase().contains('hatch')).toList();
       
       if (completedBatches.isNotEmpty) {
-        // Calculate average hatch rate if we have hatch data
+        // Calculate average hatch rate 
         double totalRate = 0.0;
         int validBatches = 0;
         
@@ -695,7 +685,7 @@ class _OverviewPageState extends State<OverviewPage> {
       }
       
       if (!isCompleted) {
-        // Check for next candling day (7, 14, 18)
+        // Check for next candling day 
         for (int day in [7, 14, 18]) {
           if (daysElapsed < day) {
             final DateTime candlingDate = startDate.add(Duration(days: day));

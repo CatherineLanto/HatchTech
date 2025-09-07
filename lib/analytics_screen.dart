@@ -75,14 +75,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   String _getNextCandlingDate() {
-    // Find the next candling date from active batches
     DateTime? nextCandling;
     
     widget.incubatorData.forEach((name, data) {
       final int startDateMs = data['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
       final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
       
-      // Candling typically done on days 7, 14, 18
       final List<int> candlingDays = [7, 14, 18];
       final DateTime now = DateTime.now();
       final int daysElapsed = now.difference(startDate).inDays;
@@ -135,7 +133,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
                 Row(
                   children: [
                     Container(
@@ -283,7 +280,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
                 const SizedBox(height: 16),
 
-                // Info text
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -319,7 +315,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   void _scheduleCandling(String incubatorName, String batchName, int? nextCandlingDay) {
-    Navigator.of(context).pop(); // Close the scheduler dialog
+    Navigator.of(context).pop();
 
     if (nextCandlingDay == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -343,12 +339,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       return;
     }
 
-    // Show date picker for user to select the candling date
     _showDatePicker(incubatorName, batchName, nextCandlingDay);
   }
 
   void _showDatePicker(String incubatorName, String batchName, int candlingDay) {
-    // Calculate suggested date (original logic)
     final data = widget.incubatorData[incubatorName];
     final int startDateMs = data?['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
     final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
@@ -384,7 +378,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   void _confirmScheduling(String incubatorName, String batchName, int candlingDay, DateTime selectedDate) {
     final String scheduleKey = '${incubatorName}_day_$candlingDay';
 
-    // Add to scheduled candling
     setState(() {
       scheduledCandling[scheduleKey] = {
         'incubatorName': incubatorName,
@@ -395,12 +388,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       };
     });
 
-    // Notify parent about the scheduled candling
     if (widget.onCandlingScheduled != null) {
       widget.onCandlingScheduled!(Map.from(scheduledCandling));
     }
 
-    // Show success confirmation
+    // Success confirmation
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Column(
@@ -458,7 +450,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
                 Row(
                   children: [
                     Icon(Icons.egg, color: Colors.blue, size: 28),
@@ -532,14 +523,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
                 const SizedBox(height: 24),
 
-                // Action Button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.of(context).pop();
-                      // Navigate to dashboard with the specific incubator selected
-                      // This will be handled by the parent navigation
                       _navigateToDashboard(incubatorName);
                     },
                     style: ElevatedButton.styleFrom(
@@ -607,7 +595,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         title: const Text('Analytics'),
         backgroundColor: Colors.blueAccent,
         foregroundColor: Colors.white,
-        automaticallyImplyLeading: false, // Remove back button since we're using bottom nav
+        automaticallyImplyLeading: false, 
         actions: [
           IconButton(
             icon: const Icon(Icons.person),
@@ -633,8 +621,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       themeNotifier: widget.themeNotifier,
                       userName: widget.userName,
                       onUserNameChanged: () async {
-                        // This will be handled by the parent MainNavigation
-                        // via the stream-based approach we implemented
                       },
                     ),
                   ),
@@ -649,7 +635,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Hatch Rate Statistics Section - Convert to Banner Style
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -711,8 +696,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             
             const SizedBox(height: 24),
             
-            // Candling Schedule - Convert to Timeline Style
-            // Candling Schedule Section Header with Tap Hint
             Row(
               children: [
                 Text(
@@ -738,7 +721,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             
             const SizedBox(height: 24),
             
-            // Active Batches Section - Now Clickable
+            // Active Batches Section
             Row(
               children: [
                 Text(
@@ -1049,7 +1032,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     return Column(
       children: localBatchHistory.map((batch) {
-        // Calculate success rate
         final int eggsStarted = batch['eggCount'] ?? 0;
         final int eggsHatched = batch['hatchedCount'] ?? 0;
         final double successRate = eggsStarted > 0 ? (eggsHatched / eggsStarted) * 100 : 0.0;
@@ -1058,7 +1040,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ? Colors.green 
             : (successRate >= 70 ? Colors.orange : Colors.red);
 
-        // Parse dates - dates are stored as milliseconds since epoch
         final DateTime? startDate = batch['startDate'] != null 
             ? DateTime.fromMillisecondsSinceEpoch(batch['startDate']) 
             : null;
@@ -1066,7 +1047,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ? DateTime.fromMillisecondsSinceEpoch(batch['completedDate']) 
             : null;
 
-        // Get completion reason
         final String completionReason = batch['completionReason'] ?? 'Completed';
         final IconData reasonIcon = completionReason == 'Completed' 
             ? Icons.check_circle
@@ -1195,11 +1175,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                // Find the index of this batch in the history using a more reliable method
                 int index = -1;
                 for (int i = 0; i < localBatchHistory.length; i++) {
                   final historyBatch = localBatchHistory[i];
-                  // Compare multiple fields to find the exact batch
                   if (historyBatch['batchName'] == batch['batchName'] &&
                       historyBatch['startDate'] == batch['startDate'] &&
                       historyBatch['completedDate'] == batch['completedDate']) {
@@ -1211,10 +1189,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 if (index != -1) {
                   debugPrint('Deleting batch at index $index: ${batch['batchName']}');
                   
-                  // Call the parent deletion callback
                   widget.onDeleteBatch?.call(index);
                   
-                  // Also update local state immediately for instant UI update
                   setState(() {
                     localBatchHistory.removeAt(index);
                   });

@@ -58,9 +58,8 @@ class _MainNavigationState extends State<MainNavigation> {
   }
 
   void _refreshBatchHistory() {
-    // This will trigger the dashboard to reload batch history
     setState(() {
-      // Force rebuild to refresh data
+      // Trigger a rebuild to refresh batch history
     });
   }
 
@@ -77,7 +76,6 @@ class _MainNavigationState extends State<MainNavigation> {
       
       debugPrint('After deletion, remaining batches: ${batchHistory.length}');
       
-      // Save the updated batch history directly to SharedPreferences
       try {
         final prefs = await SharedPreferences.getInstance();
         final historyJson = jsonEncode(batchHistory);
@@ -94,13 +92,13 @@ class _MainNavigationState extends State<MainNavigation> {
   void _navigateToDashboard(String incubatorName) {
     setState(() {
       selectedIncubatorName = incubatorName;
-      _currentIndex = 1; // Switch to Dashboard tab
+      _currentIndex = 1; 
     });
   }
 
   void _navigateToAnalytics() {
     setState(() {
-      _currentIndex = 2; // Switch to Analytics tab
+      _currentIndex = 2; 
     });
   }
 
@@ -113,7 +111,7 @@ class _MainNavigationState extends State<MainNavigation> {
         index: _currentIndex,
         children: [
           OverviewPage(
-            key: ValueKey('overview_$currentUserName'), // Force rebuild when username changes
+            key: ValueKey('overview_$currentUserName'), 
             userName: currentUserName,
             themeNotifier: widget.themeNotifier,
             sharedIncubatorData: sharedIncubatorData.isNotEmpty ? sharedIncubatorData : null,
@@ -124,7 +122,7 @@ class _MainNavigationState extends State<MainNavigation> {
             onNavigateToAnalytics: _navigateToAnalytics,
           ),
           Dashboard(
-            key: ValueKey('dashboard_${currentUserName}_$selectedIncubatorName'), // Force rebuild when username or incubator changes
+            key: ValueKey('dashboard_${currentUserName}_$selectedIncubatorName'), 
             incubatorName: selectedIncubatorName.isNotEmpty 
                 ? selectedIncubatorName 
                 : (sharedIncubatorData.isNotEmpty ? sharedIncubatorData.keys.first : 'Incubator 1'),
@@ -138,7 +136,7 @@ class _MainNavigationState extends State<MainNavigation> {
             onBatchHistoryChanged: _updateBatchHistory,
           ),
           AnalyticsScreen(
-            key: ValueKey('analytics_$currentUserName'), // Force rebuild when username changes
+            key: ValueKey('analytics_$currentUserName'), 
             userName: currentUserName,
             themeNotifier: widget.themeNotifier,
             incubatorData: sharedIncubatorData,

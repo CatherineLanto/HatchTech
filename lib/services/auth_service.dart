@@ -5,7 +5,6 @@ class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Get current user
   static User? get currentUser => _auth.currentUser;
 
   // Sign up with email and password

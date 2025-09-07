@@ -93,8 +93,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (result['success']) {
-      // AuthWrapper will automatically handle navigation to MainNavigation
-      // when it detects the user is signed in
+      // Login successful, navigation is handled by AuthWrapper
     } else {
       if (mounted) {
         setState(() {

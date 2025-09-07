@@ -46,7 +46,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     } catch (e) {
-      // Handle error if needed
       setState(() {
         originalLoginName = widget.userName;
         userEmail = AuthService.currentUser?.email ?? '';
@@ -69,7 +68,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final newUsername = _nameController.text.trim();
     
-    // Only update if username has changed
     bool usernameChanged = newUsername != originalLoginName;
 
     if (usernameChanged && newUsername.isNotEmpty) {
@@ -83,13 +81,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
 
         if (result['success']) {
-          // Update local state
           setState(() {
             originalLoginName = newUsername;
             _isEditing = false;
           });
 
-          // Notify parent about username change
           widget.onUserNameChanged?.call();
 
           ScaffoldMessenger.of(context).showSnackBar(
@@ -159,7 +155,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             const SizedBox(height: 24),
 
-            // Username Display with Subtle Edit
             GestureDetector(
               onTap: () {
                 if (!_isEditing) {
@@ -315,14 +310,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 onPressed: () async {
                   await _saveUserData();
                   
-                  // Sign out from Firebase
                   await AuthService.signOut();
                   
                   if (mounted) {
-                    // Close the profile modal/screen first
                     Navigator.of(context).pop();
-                    // AuthWrapper will automatically handle the navigation to LoginScreen
-                    // when it detects the user is signed out
                   }
                 },
               ),

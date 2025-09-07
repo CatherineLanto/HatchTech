@@ -110,8 +110,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       Navigator.pop(context);
-                      // AuthWrapper will automatically handle navigation to MainNavigation
-                      // when it detects the user is signed in
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueAccent,

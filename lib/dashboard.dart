@@ -49,7 +49,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   late Animation<double> _warningAnimation;
 
   final Map<String, Map<String, dynamic>> incubatorData = {};
-  List<Map<String, dynamic>> batchHistory = []; // Store completed/replaced batches
+  List<Map<String, dynamic>> batchHistory = []; 
 
   @override
   void initState() {
@@ -84,13 +84,13 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
           'eggCount': 24,
           'eggBreed': 'Rhode Island Red',
           'candlingDates': {
-            '7': false,  // Day 7 candling done
-            '14': false, // Day 14 candling done
-            '18': false, // Day 18 candling done
+            '7': false,  
+            '14': false, 
+            '18': false, 
           },
-          'fertilityRate': null, // Percentage after first candling
-          'viableEggs': 24, // Current viable egg count
-          'hatchedCount': null, // Final hatched count
+          'fertilityRate': null,
+          'viableEggs': 24,
+          'hatchedCount': null,
         },
         'Incubator 2': {
           'temperature': 37.8, 
@@ -105,12 +105,12 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
           'eggCount': 18,
           'eggBreed': 'Leghorn',
           'candlingDates': {
-            '7': true,   // Day 7 candling done
-            '14': false, // Day 14 candling done
-            '18': false, // Day 18 candling done
+            '7': true,  
+            '14': false, 
+            '18': false, 
           },
-          'fertilityRate': 85.0, // 85% fertility rate after day 7 candling
-          'viableEggs': 15, // 15 viable eggs remaining
+          'fertilityRate': 85.0,
+          'viableEggs': 15, 
           'hatchedCount': null,
         },
       });
@@ -144,7 +144,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     });
     
     _notifyDataChanged();
-    _loadBatchHistory(); // Load batch history from SharedPreferences
+    _loadBatchHistory(); 
   }
 
   double _clampValue(double value, double min, double max) {
@@ -257,7 +257,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         batchHistory = historyData.cast<Map<String, dynamic>>();
       });
       
-      // Notify parent about loaded batch history
       if (widget.onBatchHistoryChanged != null) {
         widget.onBatchHistoryChanged!(List.from(batchHistory));
       }
@@ -275,7 +274,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       final historyJson = jsonEncode(batchHistory);
       await prefs.setString('batch_history', historyJson);
       
-      // Notify parent about batch history changes
       if (widget.onBatchHistoryChanged != null) {
         widget.onBatchHistoryChanged!(List.from(batchHistory));
       }
@@ -288,10 +286,10 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     final historyEntry = Map<String, dynamic>.from(batchData);
     historyEntry['incubatorName'] = incubatorName;
     historyEntry['completedDate'] = DateTime.now().millisecondsSinceEpoch;
-    historyEntry['completionReason'] = reason; // 'Completed', 'Replaced', 'Manually Ended'
+    historyEntry['completionReason'] = reason; 
     
     setState(() {
-      batchHistory.insert(0, historyEntry); // Add to beginning (newest first)
+      batchHistory.insert(0, historyEntry); 
     });
     _saveBatchHistory();
   }
@@ -379,7 +377,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     ),
   );
   }
-
 
   @override
   void dispose() {
@@ -1028,7 +1025,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     final TextEditingController eggCountController = TextEditingController(text: (data['eggCount'] ?? 0).toString());
     final TextEditingController breedController = TextEditingController(text: data['eggBreed'] ?? '');
     
-    Navigator.pop(context); // Close the details dialog first
+    Navigator.pop(context); 
     
     showDialog(
       context: context,
@@ -1087,8 +1084,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Close edit dialog
-              // Show batch details again
+              Navigator.pop(context); 
               showBatchDialog(context, incubatorData[selectedIncubator]!);
             },
             child: const Text('Cancel'),
@@ -1108,8 +1104,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                   incubatorData[selectedIncubator]!['eggBreed'] = newBreed.isEmpty ? 'Unknown' : newBreed;
                 });
                 _notifyDataChanged();
-                Navigator.pop(context); // Close edit dialog
-                // Show batch details again
+                Navigator.pop(context); 
                 showBatchDialog(context, incubatorData[selectedIncubator]!);
               }
             },
@@ -1127,10 +1122,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         currentBatch['batchName'].toString().isNotEmpty;
 
     if (hasActiveBatch) {
-      // Show warning dialog first
       showActiveBatchWarningDialog(context);
     } else {
-      // Directly show new batch dialog
       showNewBatchFormDialog(context);
     }
   }
@@ -1256,10 +1249,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
           ),
           ElevatedButton(
             onPressed: () {
-              // Save current batch to history
               _addBatchToHistory(currentBatch, selectedIncubator, reason: 'Replaced');
               Navigator.pop(context);
-              // Show new batch form
               showNewBatchFormDialog(context);
             },
             style: ElevatedButton.styleFrom(
@@ -1591,7 +1582,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   }
 
   Widget _buildCandlingRowWithScheduled(String label, bool isDone, bool isDarkMode, int day, String incubatorName) {
-    // Check if this candling is scheduled
     final String scheduleKey = '${incubatorName}_day_$day';
     final bool isScheduled = widget.scheduledCandlingData?.containsKey(scheduleKey) ?? false;
     Map<String, dynamic>? scheduleInfo;
@@ -1684,13 +1674,12 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       DateTime.fromMillisecondsSinceEpoch(data['startDate'] ?? DateTime.now().millisecondsSinceEpoch)
     ).inDays;
     
-    // Determine which candling days are available
     final List<int> availableDays = [7, 14, 18].where((day) => daysElapsed >= day).toList();
     final TextEditingController viableEggController = TextEditingController(
       text: (data['viableEggs'] ?? data['eggCount'] ?? 0).toString()
     );
     
-    Navigator.pop(context); // Close the details dialog
+    Navigator.pop(context); 
     
     showDialog(
       context: context,
@@ -1724,7 +1713,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                       onChanged: (bool? value) {
                         setDialogState(() {
                           data['candlingDates']['$day'] = value ?? false;
-                          // Calculate fertility rate if first candling is done
                           if (day == 7 && value == true && data['fertilityRate'] == null) {
                             final viableCount = int.tryParse(viableEggController.text) ?? (data['viableEggs'] ?? data['eggCount'] ?? 0);
                             data['fertilityRate'] = ((viableCount / (data['eggCount'] ?? 1)) * 100);
@@ -1759,7 +1747,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                       final int viableCount = int.tryParse(value) ?? 0;
                       setDialogState(() {
                         data['viableEggs'] = viableCount;
-                        // Update fertility rate if day 7 candling is done
                         if (data['candlingDates']['7'] == true) {
                           data['fertilityRate'] = ((viableCount / (data['eggCount'] ?? 1)) * 100);
                         }
@@ -1801,8 +1788,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
             actions: [
               TextButton(
                 onPressed: () {
-                  Navigator.pop(context); // Close candling dialog
-                  // Show batch details again
+                  Navigator.pop(context); 
                   showBatchDialog(context, incubatorData[selectedIncubator]!);
                 },
                 child: Text(
@@ -1813,10 +1799,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
               ElevatedButton(
                 onPressed: () {
                   setState(() {
-                    // Ensure candling data is properly saved to the main incubator data
                     final String incubatorKey = selectedIncubator;
                     if (incubatorData.containsKey(incubatorKey)) {
-                      // Update the main data structure with any changes made in the dialog
                       incubatorData[incubatorKey]!['candlingDates'] = Map<String, dynamic>.from(data['candlingDates'] ?? {});
                       if (data['fertilityRate'] != null) {
                         incubatorData[incubatorKey]!['fertilityRate'] = data['fertilityRate'];
@@ -1827,8 +1811,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                     }
                     _notifyDataChanged();
                   });
-                  Navigator.pop(context); // Close candling dialog
-                  // Show batch details again
+                  Navigator.pop(context); 
                   showBatchDialog(context, incubatorData[selectedIncubator]!);
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -1855,7 +1838,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final TextEditingController hatchedController = TextEditingController();
     
-    Navigator.pop(context); // Close the details dialog
+    Navigator.pop(context); 
     
     showDialog(
       context: context,
@@ -1964,8 +1947,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         actions: [
           TextButton(
             onPressed: () {
-              Navigator.pop(context); // Close hatch dialog
-              // Show batch details again
+              Navigator.pop(context); 
               showBatchDialog(context, incubatorData[selectedIncubator]!);
             },
             child: Text(
@@ -1984,15 +1966,12 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                 });
                 _notifyDataChanged();
                 
-                // Save completed batch to history
                 _addBatchToHistory(data, selectedIncubator, reason: 'Completed');
                 
-                Navigator.pop(context); // Close hatch dialog
-                
-                // Show batch details again
+                Navigator.pop(context); 
+
                 showBatchDialog(context, incubatorData[selectedIncubator]!);
                 
-                // Calculate success rate for the message
                 final double successRate = (hatchedCount / (data['eggCount'] ?? 1)) * 100;
                 
                 // Show success message
@@ -2177,7 +2156,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   }
 
   void _notifyScheduleChange(Map<String, Map<String, dynamic>> updatedSchedules) {
-    // We need to add this callback to the Dashboard widget
     if (widget.onScheduleChanged != null) {
       widget.onScheduleChanged!(updatedSchedules);
     }
