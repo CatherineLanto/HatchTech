@@ -9,8 +9,10 @@ class Dashboard extends StatefulWidget {
   final String userName;
   final ValueNotifier<ThemeMode> themeNotifier;
   final Map<String, Map<String, dynamic>>? incubatorData;
+  final Map<String, Map<String, dynamic>>? scheduledCandlingData;
   final Function(Map<String, Map<String, dynamic>>)? onDataChanged;
   final Function(String)? onUserNameChanged;
+  final Function(Map<String, Map<String, dynamic>>)? onScheduleChanged;
   
   const Dashboard({
     super.key, 
@@ -18,8 +20,10 @@ class Dashboard extends StatefulWidget {
     required this.userName, 
     required this.themeNotifier,
     this.incubatorData,
+    this.scheduledCandlingData,
     this.onDataChanged,
     this.onUserNameChanged,
+    this.onScheduleChanged,
   });
 
   @override
@@ -806,7 +810,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                         ),
                       ),
                       Text(
-                        daysRemaining > 0 ? '$daysRemaining days left' : 'Ready!',
+                        daysRemaining == 0 ? 'Ready to hatch!' : 
+                        daysRemaining == 1 ? '1 day left' : '$daysRemaining days left',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
@@ -880,7 +885,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
               '$daysElapsed days, $hoursElapsed hours', isDarkMode),
             const SizedBox(height: 8),
             _buildDetailRow('Days Remaining:', 
-              daysRemaining > 0 ? '$daysRemaining days' : 'Ready to hatch!', isDarkMode),
+              daysRemaining == 0 ? 'Ready to hatch!' : 
+              daysRemaining == 1 ? '1 day left' : '$daysRemaining days left', isDarkMode),
             const SizedBox(height: 8),
             _buildDetailRow('Incubation Period:', '$incubationDays days', isDarkMode),
             const SizedBox(height: 16),
@@ -894,14 +900,11 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
               ),
             ),
             const SizedBox(height: 8),
-            _buildCandlingRow('Day 7:', data['candlingDates']['7'] ?? false, isDarkMode, 
-              onTap: () => showCandlingDialog(context, data)),
+            _buildCandlingRowWithScheduled('Day 7:', data['candlingDates']['7'] ?? false, isDarkMode, 7, selectedIncubator),
             const SizedBox(height: 4),
-            _buildCandlingRow('Day 14:', data['candlingDates']['14'] ?? false, isDarkMode,
-              onTap: () => showCandlingDialog(context, data)),
+            _buildCandlingRowWithScheduled('Day 14:', data['candlingDates']['14'] ?? false, isDarkMode, 14, selectedIncubator),
             const SizedBox(height: 4),
-            _buildCandlingRow('Day 18:', data['candlingDates']['18'] ?? false, isDarkMode,
-              onTap: () => showCandlingDialog(context, data)),
+            _buildCandlingRowWithScheduled('Day 18:', data['candlingDates']['18'] ?? false, isDarkMode, 18, selectedIncubator),
             const SizedBox(height: 8),
             if (data['fertilityRate'] != null)
               _buildDetailRow('Fertility Rate:', '${data['fertilityRate'].toStringAsFixed(1)}%', isDarkMode),
@@ -1360,27 +1363,79 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildCandlingRow(String label, bool isDone, bool isDarkMode, {VoidCallback? onTap}) {
+  Widget _buildCandlingRowWithScheduled(String label, bool isDone, bool isDarkMode, int day, String incubatorName) {
+    // Check if this candling is scheduled
+    final String scheduleKey = '${incubatorName}_day_$day';
+    final bool isScheduled = widget.scheduledCandlingData?.containsKey(scheduleKey) ?? false;
+    Map<String, dynamic>? scheduleInfo;
+    if (isScheduled) {
+      scheduleInfo = widget.scheduledCandlingData![scheduleKey];
+    }
+
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        if (isScheduled) {
+          _showEditScheduleDialog(scheduleKey, scheduleInfo!, day, incubatorName);
+        } else {
+          showCandlingDialog(context, incubatorData[selectedIncubator]!);
+        }
+      },
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(6),
-          color: onTap != null ? (isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[100]) : Colors.transparent,
+          color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[100],
+          border: isScheduled ? Border.all(
+            color: Colors.orange.withValues(alpha: 0.3),
+            width: 1,
+          ) : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              label,
-              style: TextStyle(
-                color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
-                fontSize: 14,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                      fontSize: 14,
+                    ),
+                  ),
+                  if (isScheduled) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      'Scheduled: ${scheduleInfo!['scheduledDate'].day}/${scheduleInfo['scheduledDate'].month}/${scheduleInfo['scheduledDate'].year}',
+                      style: TextStyle(
+                        color: Colors.orange,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    Text(
+                      'Tap to edit schedule',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.grey[500] : Colors.grey[500],
+                        fontSize: 10,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             Row(
               children: [
+                if (isScheduled) ...[
+                  Icon(
+                    Icons.edit_calendar,
+                    color: Colors.orange,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 Icon(
                   isDone ? Icons.check_circle : Icons.radio_button_unchecked,
                   color: isDone 
@@ -1739,5 +1794,161 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         ],
       ),
     );
+  }
+
+  void _showEditScheduleDialog(String scheduleKey, Map<String, dynamic> scheduleInfo, int candlingDay, String incubatorName) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final DateTime currentScheduledDate = scheduleInfo['scheduledDate'];
+    final String batchName = scheduleInfo['batchName'];
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : null,
+        title: Row(
+          children: [
+            Icon(Icons.edit_calendar, color: Colors.orange),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Edit Candling Schedule',
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$incubatorName - $batchName',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: isDarkMode ? Colors.white : null,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Day $candlingDay Candling',
+              style: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600]),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Current scheduled date:',
+              style: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600]),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.orange.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+              ),
+              child: Text(
+                '${currentScheduledDate.day}/${currentScheduledDate.month}/${currentScheduledDate.year}',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.orange,
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _showRescheduleDatePicker(scheduleKey, scheduleInfo, candlingDay, incubatorName);
+            },
+            child: const Text('Reschedule'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _removeSchedule(scheduleKey);
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRescheduleDatePicker(String scheduleKey, Map<String, dynamic> scheduleInfo, int candlingDay, String incubatorName) {
+    final DateTime currentDate = scheduleInfo['scheduledDate'];
+    final DateTime tomorrow = DateTime.now().add(const Duration(days: 1));
+    final DateTime initialDate = currentDate.isAfter(tomorrow) ? currentDate : tomorrow;
+
+    showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 365)),
+      helpText: 'Reschedule Candling',
+      confirmText: 'Update',
+      cancelText: 'Cancel',
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: Theme.of(context).colorScheme.copyWith(
+              primary: Colors.orange,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    ).then((selectedDate) {
+      if (selectedDate != null) {
+        _updateSchedule(scheduleKey, scheduleInfo, selectedDate);
+      }
+    });
+  }
+
+  void _updateSchedule(String scheduleKey, Map<String, dynamic> scheduleInfo, DateTime newDate) {
+    final updatedSchedule = Map<String, dynamic>.from(scheduleInfo);
+    updatedSchedule['scheduledDate'] = newDate;
+    updatedSchedule['dateScheduled'] = DateTime.now();
+
+    final Map<String, Map<String, dynamic>> updatedAllSchedules = 
+        Map.from(widget.scheduledCandlingData ?? {});
+    updatedAllSchedules[scheduleKey] = updatedSchedule;
+
+    _notifyScheduleChange(updatedAllSchedules);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Candling rescheduled to ${newDate.day}/${newDate.month}/${newDate.year}'),
+        backgroundColor: Colors.green,
+      ),
+    );
+  }
+
+  void _removeSchedule(String scheduleKey) {
+    final Map<String, Map<String, dynamic>> updatedAllSchedules = 
+        Map.from(widget.scheduledCandlingData ?? {});
+    updatedAllSchedules.remove(scheduleKey);
+
+    _notifyScheduleChange(updatedAllSchedules);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Candling schedule removed'),
+        backgroundColor: Colors.orange,
+      ),
+    );
+  }
+
+  void _notifyScheduleChange(Map<String, Map<String, dynamic>> updatedSchedules) {
+    // We need to add this callback to the Dashboard widget
+    if (widget.onScheduleChanged != null) {
+      widget.onScheduleChanged!(updatedSchedules);
+    }
   }
 }

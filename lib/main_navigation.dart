@@ -22,6 +22,7 @@ class _MainNavigationState extends State<MainNavigation> {
   late String currentUserName;
   String selectedIncubatorName = '';
   Map<String, Map<String, dynamic>> sharedIncubatorData = {};
+  Map<String, Map<String, dynamic>> scheduledCandlingData = {};
 
   @override
   void initState() {
@@ -38,6 +39,12 @@ class _MainNavigationState extends State<MainNavigation> {
   void _updateUserName(String newUserName) {
     setState(() {
       currentUserName = newUserName;
+    });
+  }
+
+  void _updateScheduledCandling(Map<String, Map<String, dynamic>> newCandlingData) {
+    setState(() {
+      scheduledCandlingData = Map.from(newCandlingData);
     });
   }
 
@@ -80,14 +87,18 @@ class _MainNavigationState extends State<MainNavigation> {
             userName: currentUserName,
             themeNotifier: widget.themeNotifier,
             incubatorData: sharedIncubatorData.isNotEmpty ? sharedIncubatorData : null,
+            scheduledCandlingData: scheduledCandlingData,
             onDataChanged: _updateSharedData,
             onUserNameChanged: _updateUserName,
+            onScheduleChanged: _updateScheduledCandling,
           ),
           AnalyticsScreen(
             key: ValueKey('analytics_$currentUserName'), // Force rebuild when username changes
             userName: currentUserName,
             themeNotifier: widget.themeNotifier,
             incubatorData: sharedIncubatorData,
+            onNavigateToDashboard: _navigateToDashboard,
+            onCandlingScheduled: _updateScheduledCandling,
           ),
         ],
       ),
