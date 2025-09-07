@@ -8,6 +8,7 @@ class OverviewPage extends StatefulWidget {
   final String userName;
   final ValueNotifier<ThemeMode> themeNotifier;
   final Map<String, Map<String, dynamic>>? sharedIncubatorData;
+  final List<Map<String, dynamic>>? batchHistory;
   final Function(Map<String, Map<String, dynamic>>)? onDataChanged;
   final Function(String)? onUserNameChanged;
   final Function(String)? onNavigateToDashboard;
@@ -18,6 +19,7 @@ class OverviewPage extends StatefulWidget {
     required this.userName,
     required this.themeNotifier,
     this.sharedIncubatorData,
+    this.batchHistory,
     this.onDataChanged,
     this.onUserNameChanged,
     this.onNavigateToDashboard,
@@ -89,6 +91,28 @@ class _OverviewPageState extends State<OverviewPage> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(OverviewPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // Check if shared incubator data has changed
+    if (widget.sharedIncubatorData != oldWidget.sharedIncubatorData) {
+      debugPrint('OverviewScreen: Shared incubator data updated');
+      if (widget.sharedIncubatorData != null && widget.sharedIncubatorData!.isNotEmpty) {
+        setState(() {
+          incubatorData = Map.from(widget.sharedIncubatorData!);
+          incubators = incubatorData.keys.toList();
+        });
+        _updateCounts();
+      }
+    }
+  }
+
+  // Helper method to get the current data source (shared or local)
+  Map<String, Map<String, dynamic>> get _currentIncubatorData {
+    return widget.sharedIncubatorData ?? incubatorData;
+  }
+
   Future<void> _loadFirebaseUserData() async {
     try {
       final userData = await AuthService.getUserData();
@@ -138,7 +162,7 @@ class _OverviewPageState extends State<OverviewPage> {
     warningIncubators.clear();
     warningDetails.clear();
 
-    incubatorData.forEach((name, values) {
+    _currentIncubatorData.forEach((name, values) {
       List<String> issues = [];
 
       if (values['humidity'] < 35 || values['humidity'] > 65) {
@@ -243,7 +267,7 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
   String _getBatchSummary(String incubatorName) {
-    final data = incubatorData[incubatorName];
+    final data = _currentIncubatorData[incubatorName];
     if (data == null) return 'No batch info';
     
     final String batchName = data['batchName'] ?? 'No batch';
@@ -251,7 +275,7 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
   String _getDaysRemaining(String incubatorName) {
-    final data = incubatorData[incubatorName];
+    final data = _currentIncubatorData[incubatorName];
     if (data == null) return '';
     
     final int startDateMs = data['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
@@ -617,23 +641,76 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
   Widget _buildAnalyticsSummaryCard(bool isDarkMode) {
+    // Use shared data if available, otherwise fall back to hardcoded
+    final dataSource = widget.sharedIncubatorData ?? incubatorData;
+    final batchHistoryData = widget.batchHistory ?? [];
+    
+    // Calculate real hatch rate from batch history
+    String hatchRate = 'N/A';
+    if (batchHistoryData.isNotEmpty) {
+      final completedBatches = batchHistoryData.where((batch) => 
+        batch['reason'] != null && batch['reason'].toString().toLowerCase().contains('hatch')).toList();
+      
+      if (completedBatches.isNotEmpty) {
+        // Calculate average hatch rate if we have hatch data
+        double totalRate = 0.0;
+        int validBatches = 0;
+        
+        for (var batch in completedBatches) {
+          if (batch['hatchRate'] != null) {
+            totalRate += (batch['hatchRate'] as num).toDouble();
+            validBatches++;
+          } else if (batch['eggsHatched'] != null && batch['totalEggs'] != null) {
+            final hatched = (batch['eggsHatched'] as num).toDouble();
+            final total = (batch['totalEggs'] as num).toDouble();
+            if (total > 0) {
+              totalRate += (hatched / total) * 100;
+              validBatches++;
+            }
+          }
+        }
+        
+        if (validBatches > 0) {
+          hatchRate = '${(totalRate / validBatches).toStringAsFixed(1)}%';
+        }
+      }
+    }
+    
     // Calculate next candling date from active batches
     String nextCandlingDate = 'No active batches';
-    incubatorData.forEach((name, data) {
+    DateTime? earliestCandling;
+    
+    dataSource.forEach((name, data) {
       final int startDateMs = data['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
       final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
       final DateTime now = DateTime.now();
       final int daysElapsed = now.difference(startDate).inDays;
       
-      // Check for next candling day (7, 14, 18)
-      for (int day in [7, 14, 18]) {
-        if (daysElapsed < day) {
-          final DateTime candlingDate = startDate.add(Duration(days: day));
-          nextCandlingDate = '${candlingDate.day}/${candlingDate.month}/${candlingDate.year}';
-          break;
+      // Check if batch is completed
+      bool isCompleted = false;
+      if (batchHistoryData.isNotEmpty) {
+        final batchName = data['batchName'] ?? '';
+        isCompleted = batchHistoryData.any((batch) => 
+          batch['batchName'] == batchName && batch['reason'] != null);
+      }
+      
+      if (!isCompleted) {
+        // Check for next candling day (7, 14, 18)
+        for (int day in [7, 14, 18]) {
+          if (daysElapsed < day) {
+            final DateTime candlingDate = startDate.add(Duration(days: day));
+            if (earliestCandling == null || candlingDate.isBefore(earliestCandling!)) {
+              earliestCandling = candlingDate;
+            }
+            break;
+          }
         }
       }
     });
+    
+    if (earliestCandling != null) {
+      nextCandlingDate = '${earliestCandling!.day}/${earliestCandling!.month}/${earliestCandling!.year}';
+    }
 
     return Card(
       color: isDarkMode ? const Color(0xFF0F1B2D) : Colors.blue.shade50,
@@ -668,7 +745,7 @@ class _OverviewPageState extends State<OverviewPage> {
                 Expanded(
                   child: _buildQuickStat(
                     'Hatch Rate',
-                    '85.5%',
+                    hatchRate,
                     Icons.trending_up,
                     Colors.green,
                     isDarkMode,
@@ -678,7 +755,7 @@ class _OverviewPageState extends State<OverviewPage> {
                 Expanded(
                   child: _buildQuickStat(
                     'Active Batches',
-                    '${incubatorData.length}',
+                    '${dataSource.length}',
                     Icons.egg,
                     Colors.orange,
                     isDarkMode,

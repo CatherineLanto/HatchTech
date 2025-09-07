@@ -5,16 +5,22 @@ class AnalyticsScreen extends StatefulWidget {
   final String userName;
   final ValueNotifier<ThemeMode> themeNotifier;
   final Map<String, Map<String, dynamic>> incubatorData;
+  final List<Map<String, dynamic>> batchHistory;
   final Function(String)? onNavigateToDashboard;
   final Function(Map<String, Map<String, dynamic>>)? onCandlingScheduled;
+  final Function(int)? onDeleteBatch;
+  final VoidCallback? onBatchHistoryChanged;
 
   const AnalyticsScreen({
     super.key,
     required this.userName,
     required this.themeNotifier,
     required this.incubatorData,
+    this.batchHistory = const [],
     this.onNavigateToDashboard,
     this.onCandlingScheduled,
+    this.onDeleteBatch,
+    this.onBatchHistoryChanged,
   });
 
   @override
@@ -26,15 +32,46 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   // Track scheduled candling for each incubator
   Map<String, Map<String, dynamic>> scheduledCandling = {};
   
+  // Local copy of batch history for reactive updates
+  late List<Map<String, dynamic>> localBatchHistory;
+  
+  @override
+  void initState() {
+    super.initState();
+    localBatchHistory = List.from(widget.batchHistory);
+  }
+  
+  @override
+  void didUpdateWidget(AnalyticsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.batchHistory != widget.batchHistory) {
+      setState(() {
+        localBatchHistory = List.from(widget.batchHistory);
+      });
+      debugPrint('AnalyticsScreen batch history updated: ${localBatchHistory.length} batches');
+    }
+  }
+  
   // Calculate overall hatch rate from completed batches
   double _calculateOverallHatchRate() {
-    // For now, return sample data - this would be calculated from actual batch history
-    return 85.5; // 85.5% success rate
+    if (localBatchHistory.isEmpty) return 0.0;
+    
+    double totalSuccessRate = 0.0;
+    int completedBatches = 0;
+    
+    for (var batch in localBatchHistory) {
+      if (batch['hatchedCount'] != null && batch['eggCount'] != null) {
+        final double successRate = (batch['hatchedCount'] / batch['eggCount']) * 100;
+        totalSuccessRate += successRate;
+        completedBatches++;
+      }
+    }
+    
+    return completedBatches > 0 ? totalSuccessRate / completedBatches : 0.0;
   }
 
   int _getTotalCompletedBatches() {
-    // Sample data - would be calculated from batch history
-    return 12;
+    return localBatchHistory.length;
   }
 
   String _getNextCandlingDate() {
@@ -50,13 +87,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final DateTime now = DateTime.now();
       final int daysElapsed = now.difference(startDate).inDays;
       
+      // Get candling status from data
+      final Map<String, dynamic> candlingDates = data['candlingDates'] ?? {};
+      
       for (int day in candlingDays) {
-        if (daysElapsed < day) {
+        // Check if this candling day hasn't been completed yet
+        final bool candlingDone = candlingDates['$day'] == true;
+        
+        if (daysElapsed < day && !candlingDone) {
           final DateTime candlingDate = startDate.add(Duration(days: day));
           if (nextCandling == null || candlingDate.isBefore(nextCandling!)) {
             nextCandling = candlingDate;
           }
           break;
+        } else if (daysElapsed >= day && !candlingDone) {
+          // This candling is overdue
+          final DateTime candlingDate = startDate.add(Duration(days: day));
+          if (nextCandling == null || candlingDate.isBefore(nextCandling!)) {
+            nextCandling = candlingDate;
+          }
         }
       }
     });
@@ -606,7 +655,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.green.shade400, Colors.green.shade600],
+                  colors: [Colors.green.shade400, Colors.green.shade300],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -663,12 +712,25 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             const SizedBox(height: 24),
             
             // Candling Schedule - Convert to Timeline Style
-            Text(
-              'Candling Schedule',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
+            // Candling Schedule Section Header with Tap Hint
+            Row(
+              children: [
+                Text(
+                  'Candling Schedule',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                Text(
+                  'Tap to schedule',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             
@@ -942,33 +1004,75 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildBatchHistoryList(bool isDarkMode) {
-    // Sample batch history data
-    final List<Map<String, dynamic>> historyBatches = [
-      {
-        'batchName': 'Batch Z-003',
-        'incubator': 'Incubator 1',
-        'startDate': DateTime.now().subtract(const Duration(days: 45)),
-        'endDate': DateTime.now().subtract(const Duration(days: 24)),
-        'successRate': 90.0,
-        'eggsStarted': 20,
-        'eggsHatched': 18,
-      },
-      {
-        'batchName': 'Batch Y-002',
-        'incubator': 'Incubator 2',
-        'startDate': DateTime.now().subtract(const Duration(days: 70)),
-        'endDate': DateTime.now().subtract(const Duration(days: 49)),
-        'successRate': 80.0,
-        'eggsStarted': 15,
-        'eggsHatched': 12,
-      },
-    ];
+    if (localBatchHistory.isEmpty) {
+      return SizedBox(
+        width: double.infinity,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDarkMode ? const Color(0xFF333333) : Colors.grey[300]!,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                Icons.history,
+                size: 48,
+                color: isDarkMode ? const Color(0xFF666666) : Colors.grey[400],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                'No Batch History Yet',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: isDarkMode ? const Color(0xFF888888) : Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Complete your first batch to see history here',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDarkMode ? const Color(0xFF666666) : Colors.grey[500],
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Column(
-      children: historyBatches.map((batch) {
-        Color rateColor = batch['successRate'] >= 85 
+      children: localBatchHistory.map((batch) {
+        // Calculate success rate
+        final int eggsStarted = batch['eggCount'] ?? 0;
+        final int eggsHatched = batch['hatchedCount'] ?? 0;
+        final double successRate = eggsStarted > 0 ? (eggsHatched / eggsStarted) * 100 : 0.0;
+        
+        Color rateColor = successRate >= 85 
             ? Colors.green 
-            : (batch['successRate'] >= 70 ? Colors.orange : Colors.red);
+            : (successRate >= 70 ? Colors.orange : Colors.red);
+
+        // Parse dates - dates are stored as milliseconds since epoch
+        final DateTime? startDate = batch['startDate'] != null 
+            ? DateTime.fromMillisecondsSinceEpoch(batch['startDate']) 
+            : null;
+        final DateTime? endDate = batch['completedDate'] != null 
+            ? DateTime.fromMillisecondsSinceEpoch(batch['completedDate']) 
+            : null;
+
+        // Get completion reason
+        final String completionReason = batch['completionReason'] ?? 'Completed';
+        final IconData reasonIcon = completionReason == 'Completed' 
+            ? Icons.check_circle
+            : completionReason == 'Replaced'
+            ? Icons.swap_horiz
+            : Icons.stop_circle;
 
         return Container(
           margin: const EdgeInsets.only(bottom: 8),
@@ -990,7 +1094,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
-                  Icons.history,
+                  reasonIcon,
                   color: rateColor,
                   size: 20,
                 ),
@@ -1001,16 +1105,24 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      '${batch['batchName']}',
+                      batch['batchName'] ?? 'Unnamed Batch',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     Text(
-                      '${batch['incubator']} • Completed ${batch['endDate'].day}/${batch['endDate'].month}/${batch['endDate'].year}',
+                      '${batch['incubatorName'] ?? 'Unknown Incubator'} • $completionReason ${endDate != null ? '${endDate.day}/${endDate.month}/${endDate.year}' : 'Unknown Date'}',
                       style: TextStyle(
                         color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
                         fontSize: 12,
                       ),
                     ),
+                    if (startDate != null && endDate != null)
+                      Text(
+                        'Duration: ${endDate.difference(startDate).inDays} days',
+                        style: TextStyle(
+                          color: isDarkMode ? const Color(0xFF888888) : Colors.grey[500],
+                          fontSize: 10,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -1018,7 +1130,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '${batch['successRate']}%',
+                    '${successRate.toStringAsFixed(1)}%',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 18,
@@ -1026,10 +1138,35 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     ),
                   ),
                   Text(
-                    '${batch['eggsHatched']}/${batch['eggsStarted']} eggs',
+                    '$eggsHatched/$eggsStarted eggs',
                     style: TextStyle(
                       fontSize: 11,
                       color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 8),
+              PopupMenuButton<String>(
+                icon: Icon(
+                  Icons.more_vert,
+                  size: 20,
+                  color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                ),
+                onSelected: (value) {
+                  if (value == 'delete') {
+                    _showDeleteBatchConfirmation(batch);
+                  }
+                },
+                itemBuilder: (BuildContext context) => [
+                  PopupMenuItem<String>(
+                    value: 'delete',
+                    child: Row(
+                      children: const [
+                        Icon(Icons.delete, color: Colors.red, size: 18),
+                        SizedBox(width: 8),
+                        Text('Delete', style: TextStyle(color: Colors.red)),
+                      ],
                     ),
                   ),
                 ],
@@ -1038,6 +1175,72 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  void _showDeleteBatchConfirmation(Map<String, dynamic> batch) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Delete Batch History'),
+          content: Text(
+            'Are you sure you want to delete "${batch['batchName'] ?? 'Unnamed Batch'}" from your batch history? This action cannot be undone.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                // Find the index of this batch in the history using a more reliable method
+                int index = -1;
+                for (int i = 0; i < localBatchHistory.length; i++) {
+                  final historyBatch = localBatchHistory[i];
+                  // Compare multiple fields to find the exact batch
+                  if (historyBatch['batchName'] == batch['batchName'] &&
+                      historyBatch['startDate'] == batch['startDate'] &&
+                      historyBatch['completedDate'] == batch['completedDate']) {
+                    index = i;
+                    break;
+                  }
+                }
+                
+                if (index != -1) {
+                  debugPrint('Deleting batch at index $index: ${batch['batchName']}');
+                  
+                  // Call the parent deletion callback
+                  widget.onDeleteBatch?.call(index);
+                  
+                  // Also update local state immediately for instant UI update
+                  setState(() {
+                    localBatchHistory.removeAt(index);
+                  });
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Batch deleted from history'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                } else {
+                  debugPrint('Batch not found for deletion: ${batch['batchName']}');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Error: Batch not found'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                }
+              },
+              style: TextButton.styleFrom(foregroundColor: Colors.red),
+              child: const Text('Delete'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

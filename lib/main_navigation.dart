@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'overview_screen.dart';
 import 'dashboard.dart';
 import 'analytics_screen.dart';
@@ -23,6 +25,7 @@ class _MainNavigationState extends State<MainNavigation> {
   String selectedIncubatorName = '';
   Map<String, Map<String, dynamic>> sharedIncubatorData = {};
   Map<String, Map<String, dynamic>> scheduledCandlingData = {};
+  List<Map<String, dynamic>> batchHistory = [];
 
   @override
   void initState() {
@@ -46,6 +49,46 @@ class _MainNavigationState extends State<MainNavigation> {
     setState(() {
       scheduledCandlingData = Map.from(newCandlingData);
     });
+  }
+
+  void _updateBatchHistory(List<Map<String, dynamic>> newBatchHistory) {
+    setState(() {
+      batchHistory = List.from(newBatchHistory);
+    });
+  }
+
+  void _refreshBatchHistory() {
+    // This will trigger the dashboard to reload batch history
+    setState(() {
+      // Force rebuild to refresh data
+    });
+  }
+
+  void _deleteBatchFromHistory(int index) async {
+    debugPrint('_deleteBatchFromHistory called with index: $index, total batches: ${batchHistory.length}');
+    
+    if (index >= 0 && index < batchHistory.length) {
+      final batchToDelete = batchHistory[index];
+      debugPrint('Deleting batch: ${batchToDelete['batchName']} at index $index');
+      
+      setState(() {
+        batchHistory.removeAt(index);
+      });
+      
+      debugPrint('After deletion, remaining batches: ${batchHistory.length}');
+      
+      // Save the updated batch history directly to SharedPreferences
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final historyJson = jsonEncode(batchHistory);
+        await prefs.setString('batch_history', historyJson);
+        debugPrint('Batch history saved to SharedPreferences');
+      } catch (e) {
+        debugPrint('Error saving updated batch history: $e');
+      }
+    } else {
+      debugPrint('Invalid index for deletion: $index (should be 0-${batchHistory.length - 1})');
+    }
   }
 
   void _navigateToDashboard(String incubatorName) {
@@ -74,6 +117,7 @@ class _MainNavigationState extends State<MainNavigation> {
             userName: currentUserName,
             themeNotifier: widget.themeNotifier,
             sharedIncubatorData: sharedIncubatorData.isNotEmpty ? sharedIncubatorData : null,
+            batchHistory: batchHistory,
             onDataChanged: _updateSharedData,
             onUserNameChanged: _updateUserName,
             onNavigateToDashboard: _navigateToDashboard,
@@ -91,14 +135,18 @@ class _MainNavigationState extends State<MainNavigation> {
             onDataChanged: _updateSharedData,
             onUserNameChanged: _updateUserName,
             onScheduleChanged: _updateScheduledCandling,
+            onBatchHistoryChanged: _updateBatchHistory,
           ),
           AnalyticsScreen(
             key: ValueKey('analytics_$currentUserName'), // Force rebuild when username changes
             userName: currentUserName,
             themeNotifier: widget.themeNotifier,
             incubatorData: sharedIncubatorData,
+            batchHistory: batchHistory,
             onNavigateToDashboard: _navigateToDashboard,
             onCandlingScheduled: _updateScheduledCandling,
+            onDeleteBatch: _deleteBatchFromHistory,
+            onBatchHistoryChanged: _refreshBatchHistory,
           ),
         ],
       ),

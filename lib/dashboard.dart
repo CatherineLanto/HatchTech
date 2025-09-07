@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
+import 'dart:convert';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'profile_screen.dart';
 import 'services/auth_service.dart';
 
@@ -13,6 +15,7 @@ class Dashboard extends StatefulWidget {
   final Function(Map<String, Map<String, dynamic>>)? onDataChanged;
   final Function(String)? onUserNameChanged;
   final Function(Map<String, Map<String, dynamic>>)? onScheduleChanged;
+  final Function(List<Map<String, dynamic>>)? onBatchHistoryChanged;
   
   const Dashboard({
     super.key, 
@@ -24,6 +27,7 @@ class Dashboard extends StatefulWidget {
     this.onDataChanged,
     this.onUserNameChanged,
     this.onScheduleChanged,
+    this.onBatchHistoryChanged,
   });
 
   @override
@@ -45,6 +49,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   late Animation<double> _warningAnimation;
 
   final Map<String, Map<String, dynamic>> incubatorData = {};
+  List<Map<String, dynamic>> batchHistory = []; // Store completed/replaced batches
 
   @override
   void initState() {
@@ -139,6 +144,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     });
     
     _notifyDataChanged();
+    _loadBatchHistory(); // Load batch history from SharedPreferences
   }
 
   double _clampValue(double value, double min, double max) {
@@ -239,6 +245,55 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     if (widget.onDataChanged != null) {
       widget.onDataChanged!(Map.from(incubatorData));
     }
+  }
+
+  // Batch History Management Methods
+  Future<void> _loadBatchHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final historyJson = prefs.getString('batch_history') ?? '[]';
+      final List<dynamic> historyData = jsonDecode(historyJson);
+      setState(() {
+        batchHistory = historyData.cast<Map<String, dynamic>>();
+      });
+      
+      // Notify parent about loaded batch history
+      if (widget.onBatchHistoryChanged != null) {
+        widget.onBatchHistoryChanged!(List.from(batchHistory));
+      }
+    } catch (e) {
+      debugPrint('Error loading batch history: $e');
+      setState(() {
+        batchHistory = [];
+      });
+    }
+  }
+
+  Future<void> _saveBatchHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final historyJson = jsonEncode(batchHistory);
+      await prefs.setString('batch_history', historyJson);
+      
+      // Notify parent about batch history changes
+      if (widget.onBatchHistoryChanged != null) {
+        widget.onBatchHistoryChanged!(List.from(batchHistory));
+      }
+    } catch (e) {
+      debugPrint('Error saving batch history: $e');
+    }
+  }
+
+  void _addBatchToHistory(Map<String, dynamic> batchData, String incubatorName, {String reason = 'Completed'}) {
+    final historyEntry = Map<String, dynamic>.from(batchData);
+    historyEntry['incubatorName'] = incubatorName;
+    historyEntry['completedDate'] = DateTime.now().millisecondsSinceEpoch;
+    historyEntry['completionReason'] = reason; // 'Completed', 'Replaced', 'Manually Ended'
+    
+    setState(() {
+      batchHistory.insert(0, historyEntry); // Add to beginning (newest first)
+    });
+    _saveBatchHistory();
   }
 
   void addNewIncubator() {
@@ -1066,6 +1121,159 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   }
 
   void showStartNewBatchDialog(BuildContext context) {
+    final currentBatch = incubatorData[selectedIncubator];
+    final bool hasActiveBatch = currentBatch != null && 
+        currentBatch['batchName'] != null && 
+        currentBatch['batchName'].toString().isNotEmpty;
+
+    if (hasActiveBatch) {
+      // Show warning dialog first
+      showActiveBatchWarningDialog(context);
+    } else {
+      // Directly show new batch dialog
+      showNewBatchFormDialog(context);
+    }
+  }
+
+  void showActiveBatchWarningDialog(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final currentBatch = incubatorData[selectedIncubator]!;
+    final String currentBatchName = currentBatch['batchName'] ?? 'Unknown Batch';
+    final int startDateMs = currentBatch['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
+    final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
+    final int daysElapsed = DateTime.now().difference(startDate).inDays;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : null,
+        title: Row(
+          children: [
+            Icon(
+              Icons.warning,
+              color: Colors.orange,
+              size: 28,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Replace Active Batch?',
+                style: TextStyle(
+                  color: isDarkMode ? Colors.white : Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'You currently have an active batch in progress:',
+              style: TextStyle(
+                color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDarkMode ? const Color(0xFF2A2A2A) : Colors.grey[100],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isDarkMode ? const Color(0xFF444444) : Colors.grey[300]!,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '📦 $currentBatchName',
+                    style: TextStyle(
+                      color: isDarkMode ? Colors.white : Colors.black,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '🥚 ${currentBatch['eggCount']} ${currentBatch['eggBreed'] ?? 'Unknown'} eggs',
+                    style: TextStyle(
+                      color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '📅 Day $daysElapsed of ${currentBatch['incubationDays'] ?? 21}',
+                    style: TextStyle(
+                      color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDarkMode ? const Color(0xFF2A1F1F) : Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info,
+                    color: Colors.orange,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Starting a new batch will save your current batch to history and replace it.',
+                      style: TextStyle(
+                        color: isDarkMode ? Colors.orange.shade200 : Colors.orange.shade700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600]),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              // Save current batch to history
+              _addBatchToHistory(currentBatch, selectedIncubator, reason: 'Replaced');
+              Navigator.pop(context);
+              // Show new batch form
+              showNewBatchFormDialog(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Replace & Continue'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void showNewBatchFormDialog(BuildContext context) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final TextEditingController batchController = TextEditingController();
     final TextEditingController eggCountController = TextEditingController(text: '12');
@@ -1076,9 +1284,19 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : null,
-        title: Text(
-          'Start New Batch',
-          style: TextStyle(color: isDarkMode ? Colors.white : null),
+        title: Row(
+          children: [
+            Icon(
+              Icons.add_circle,
+              color: isDarkMode ? const Color(0xFF4CAF50) : Colors.green,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Start New Batch',
+              style: TextStyle(color: isDarkMode ? Colors.white : null),
+            ),
+          ],
         ),
         content: SingleChildScrollView(
           child: Column(
@@ -1111,7 +1329,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                 decoration: InputDecoration(
                   labelText: 'Egg Breed/Type',
                   labelStyle: TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : null),
-                  hintText: 'e.g., Rhode Island Red, Leghorn',
+                  hintText: 'e.g., Rhode Island Red',
                   hintStyle: TextStyle(color: isDarkMode ? const Color(0xFF666666) : null),
                 ),
               ),
@@ -1160,6 +1378,15 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                 });
                 _notifyDataChanged();
                 Navigator.pop(context);
+                
+                // Show success message
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('New batch "$batchName" started successfully!'),
+                    backgroundColor: Colors.green,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
               }
             },
             style: ElevatedButton.styleFrom(
@@ -1756,6 +1983,10 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                   data['hatchedCount'] = hatchedCount;
                 });
                 _notifyDataChanged();
+                
+                // Save completed batch to history
+                _addBatchToHistory(data, selectedIncubator, reason: 'Completed');
+                
                 Navigator.pop(context); // Close hatch dialog
                 
                 // Show batch details again
