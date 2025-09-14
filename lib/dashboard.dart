@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'profile_screen.dart';
 import 'services/auth_service.dart';
 
@@ -38,7 +39,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   String selectedIncubator = 'Incubator 1';
   bool showWarning = false;
   List<Map<String, dynamic>> currentAlerts = [];
-  late Timer dataUpdateTimer;
+  Timer? dataUpdateTimer;
   Timer? _autoDismissTimer;
   DateTime? lastAlertTime;
   final Duration alertCooldown = const Duration(seconds: 20);
@@ -116,40 +117,52 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       });
     }
     
-    selectedIncubator = widget.incubatorName;
-    dataUpdateTimer = Timer.periodic(const Duration(seconds: 2), (_) => updateSensorData());
+  selectedIncubator = widget.incubatorName;
+  // Listen to Firebase Realtime Database for sensor data
+  listenToSensorData();
   }
 
-  void updateSensorData() {
-    setState(() {
-      incubatorData.forEach((key, values) {
-        values['temperature'] = _clampValue(
-          values['temperature'] + (Random().nextDouble() - 0.5) * 0.8, 
-          35.0, 40.0 
-        );
-        values['humidity'] = _clampValue(
-          values['humidity'] + (Random().nextDouble() - 0.5) * 6.0, 
-          30.0, 70.0 
-        );
-        values['oxygen'] = _clampValue(
-          values['oxygen'] + (Random().nextDouble() - 0.5) * 1.0, 
-          18.0, 22.0 
-        );
-        values['co2'] = _clampValue(
-          values['co2'] + (Random().nextDouble() - 0.5) * 100, 
-          600.0, 1100.0 
-        );
-      });
-      checkAlerts();
-    });
-    
-    _notifyDataChanged();
-    _loadBatchHistory(); 
+  // Removed updateSensorData: now handled by Firebase listener
+  void listenToSensorData() {
+    final dbRef = FirebaseDatabase.instance.ref('HatchTech/Incubator1');
+    dbRef.onValue.listen(
+      (event) {
+        try {
+          final data = event.snapshot.value as Map?;
+          print('Received sensor data: $data'); // Debug print
+          if (data != null) {
+            setState(() {
+              incubatorData['Incubator 1'] = Map<String, dynamic>.from({
+                ...incubatorData['Incubator 1'] ?? {},
+                ...data,
+                'temperature': (data['temperature'] is num)
+                    ? (data['temperature'] as num).toDouble()
+                    : (incubatorData['Incubator 1']?['temperature'] ?? 0.0),
+                'humidity': (data['humidity'] is num)
+                    ? (data['humidity'] as num).toDouble()
+                    : (incubatorData['Incubator 1']?['humidity'] ?? 0.0),
+                'oxygen': (data['oxygen'] is num)
+                    ? (data['oxygen'] as num).toDouble()
+                    : (incubatorData['Incubator 1']?['oxygen'] ?? 0.0),
+                'co2': (data['co2'] is num)
+                    ? (data['co2'] as num).toDouble()
+                    : (incubatorData['Incubator 1']?['co2'] ?? 0.0),
+              });
+            });
+            checkAlerts();
+            _notifyDataChanged();
+          }
+        } catch (e, stack) {
+          print('Error in sensor listener: $e\n$stack');
+        }
+      },
+      onError: (error) {
+        print('Firebase listener error: $error');
+      },
+    );
   }
 
-  double _clampValue(double value, double min, double max) {
-    return value.clamp(min, max);
-  }
+  // Removed unused _clampValue method
 
   void checkAlerts() {
     final now = DateTime.now();
@@ -248,25 +261,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   }
 
   // Batch History Management Methods
-  Future<void> _loadBatchHistory() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final historyJson = prefs.getString('batch_history') ?? '[]';
-      final List<dynamic> historyData = jsonDecode(historyJson);
-      setState(() {
-        batchHistory = historyData.cast<Map<String, dynamic>>();
-      });
-      
-      if (widget.onBatchHistoryChanged != null) {
-        widget.onBatchHistoryChanged!(List.from(batchHistory));
-      }
-    } catch (e) {
-      debugPrint('Error loading batch history: $e');
-      setState(() {
-        batchHistory = [];
-      });
-    }
-  }
+  // Removed unused _loadBatchHistory method
 
   Future<void> _saveBatchHistory() async {
     try {
@@ -380,11 +375,12 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    dropdownFocusNode.dispose();
-    dataUpdateTimer.cancel();
-    _autoDismissTimer?.cancel();
-    _warningAnimationController.dispose();
-    super.dispose();
+  dropdownFocusNode.dispose();
+  dataUpdateTimer?.cancel();
+  _autoDismissTimer?.cancel();
+  _warningAnimationController.dispose();
+  print('Dashboard disposed, cleaning up listeners.');
+  super.dispose();
   }
 
   @override
@@ -400,7 +396,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       }
     }
 
-    final selected = incubatorData[selectedIncubator]!;
+  // Always get the latest data for the selected incubator
+  final selected = incubatorData[selectedIncubator]!;
 
     return PopScope(
       onPopInvokedWithResult: (didPop, result) {
