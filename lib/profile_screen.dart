@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatefulWidget {
   final Map<String, Map<String, dynamic>> incubatorData;
@@ -271,19 +272,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         builder: (_) => IncubatorManager(
                           incubatorData: widget.incubatorData,
-                          onDelete: (name) {
-                            if (widget.incubatorData.length <= 1) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                      "At least one incubator must remain."),
-                                ),
-                              );
-                              return;
-                            }
-                            widget.incubatorData.remove(name);
-                            Navigator.pop(context); 
-                            Navigator.pop(context, _nameController.text.trim()); 
+                          onDelete: (name) async {
+                            // Delete incubator from Firestore
+                            await FirebaseFirestore.instance.collection('incubators').doc(name).delete();
+                            Navigator.pop(context);
+                            Navigator.pop(context, _nameController.text.trim());
                           },
                         ),
                       );

@@ -59,7 +59,6 @@ class _MainNavigationState extends State<MainNavigation> {
 
   void _refreshBatchHistory() {
     setState(() {
-      // Trigger a rebuild to refresh batch history
     });
   }
 
@@ -139,8 +138,6 @@ class _MainNavigationState extends State<MainNavigation> {
             key: ValueKey('analytics_$currentUserName'), 
             userName: currentUserName,
             themeNotifier: widget.themeNotifier,
-            incubatorData: sharedIncubatorData,
-            batchHistory: batchHistory,
             onNavigateToDashboard: _navigateToDashboard,
             onCandlingScheduled: _updateScheduledCandling,
             onDeleteBatch: _deleteBatchFromHistory,

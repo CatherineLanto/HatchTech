@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import 'services/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 import 'profile_screen.dart';
 
 class OverviewPage extends StatefulWidget {
@@ -31,36 +31,14 @@ class OverviewPage extends StatefulWidget {
 }
 
 class _OverviewPageState extends State<OverviewPage> {
+  StreamSubscription? _incubatorSub;
   late String userName;
   bool isNewUser = false;
   int normalCount = 0;
   int warningCount = 0;
-  List<String> incubators = ['Incubator 1', 'Incubator 2'];
+  List<String> incubators = [];
 
-  Map<String, Map<String, dynamic>> incubatorData = {
-    'Incubator 1': {
-      'temperature': 37.5, 
-      'humidity': 50.0,  
-      'oxygen': 20.5,      
-      'co2': 800.0,      
-      'eggTurning': true,
-      'lighting': true,
-      'batchName': 'Batch A-001',
-      'startDate': DateTime.now().subtract(const Duration(days: 12)).millisecondsSinceEpoch,
-      'incubationDays': 21,
-    },
-    'Incubator 2': {
-      'temperature': 37.8, 
-      'humidity': 55.0,    
-      'oxygen': 20.0,     
-      'co2': 750.0,       
-      'eggTurning': false,
-      'lighting': false,
-      'batchName': 'Batch B-002',
-      'startDate': DateTime.now().subtract(const Duration(days: 7)).millisecondsSinceEpoch,
-      'incubationDays': 21,
-    },
-  };
+  Map<String, Map<String, dynamic>> incubatorData = {};
 
   List<String> normalIncubators = [];
   List<String> warningIncubators = [];
@@ -71,21 +49,24 @@ class _OverviewPageState extends State<OverviewPage> {
     super.initState();
     userName = widget.userName;
     
-    if (widget.sharedIncubatorData != null && widget.sharedIncubatorData!.isNotEmpty) {
+    _incubatorSub = FirebaseFirestore.instance.collection('incubators').snapshots().listen((snapshot) {
+      final Map<String, Map<String, dynamic>> fetchedData = {};
+      for (var doc in snapshot.docs) {
+        fetchedData[doc.id] = Map<String, dynamic>.from(doc.data());
+      }
       setState(() {
-        incubatorData = Map.from(widget.sharedIncubatorData!);
+        incubatorData = fetchedData;
         incubators = incubatorData.keys.toList();
       });
       _updateCounts();
-    } else {
-      _loadUserData();
-    }
+    });
     
     _loadFirebaseUserData();
   }
 
   @override
   void dispose() {
+  _incubatorSub?.cancel();
     super.dispose();
   }
 
@@ -122,7 +103,6 @@ class _OverviewPageState extends State<OverviewPage> {
         }
       }
 
-      // Check if user is new
       final userIsNew = await AuthService.isNewUser();
       if (mounted) {
         setState(() {
@@ -130,7 +110,7 @@ class _OverviewPageState extends State<OverviewPage> {
         });
       }
     } catch (e) {
-      // Handle error silently - keep existing username
+      // Handle error silently and keep existing username
     }
   }
 
@@ -141,7 +121,6 @@ class _OverviewPageState extends State<OverviewPage> {
         incubators = newData.keys.toList();
         _updateCounts();
       });
-      _saveUserData();
       
       if (widget.onDataChanged != null) {
         widget.onDataChanged!(Map.from(incubatorData));
@@ -188,75 +167,6 @@ class _OverviewPageState extends State<OverviewPage> {
     });
   }
 
-  Future<void> _loadUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final currentUser = prefs.getString('current_user') ?? '';
-    
-    if (currentUser.isNotEmpty) {
-      final savedData = prefs.getString('incubator_data_$currentUser');
-      if (savedData != null) {
-        try {
-          final Map<String, dynamic> decoded = json.decode(savedData);
-          setState(() {
-            incubatorData = decoded.map((key, value) => 
-              MapEntry(key, Map<String, dynamic>.from(value)));
-            incubators = incubatorData.keys.toList();
-          });
-        } catch (e) {
-          _initializeDefaultData();
-        }
-      } else {
-        _initializeDefaultData();
-      }
-    } else {
-      _initializeDefaultData();
-    }
-    _updateCounts();
-  }
-
-  void _initializeDefaultData() {
-    final now = DateTime.now();
-    setState(() {
-      incubatorData = {
-        'Incubator 1': {
-          'temperature': 37.5,
-          'humidity': 50.0,
-          'oxygen': 20.5,
-          'co2': 800.0,
-          'eggTurning': true,
-          'lighting': true,
-          'batchName': 'Batch A-001',
-          'startDate': now.subtract(const Duration(days: 12)).millisecondsSinceEpoch,
-          'incubationDays': 21,
-        },
-        'Incubator 2': {
-          'temperature': 37.8,
-          'humidity': 55.0,
-          'oxygen': 20.0,
-          'co2': 750.0,
-          'eggTurning': false,
-          'lighting': false,
-          'batchName': 'Batch B-002',
-          'startDate': now.subtract(const Duration(days: 7)).millisecondsSinceEpoch,
-          'incubationDays': 21,
-        },
-      };
-      incubators = incubatorData.keys.toList();
-    });
-    _saveUserData();
-  }
-
-  Future<void> _saveUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    final currentUser = prefs.getString('current_user') ?? '';
-    
-    if (currentUser.isNotEmpty) {
-      await prefs.setString('user_name_$currentUser', userName);
-      
-      final dataToSave = json.encode(incubatorData);
-      await prefs.setString('incubator_data_$currentUser', dataToSave);
-    }
-  }
 
   String _getBatchSummary(String incubatorName) {
     final data = _currentIncubatorData[incubatorName];
@@ -356,7 +266,6 @@ class _OverviewPageState extends State<OverviewPage> {
           ),
           const SizedBox(height: 20),
 
-          // Analytics Summary Card
           _buildAnalyticsSummaryCard(isDarkMode),
           const SizedBox(height: 20),
 
@@ -635,14 +544,12 @@ class _OverviewPageState extends State<OverviewPage> {
     final dataSource = widget.sharedIncubatorData ?? incubatorData;
     final batchHistoryData = widget.batchHistory ?? [];
     
-    // Calculate real hatch rate from batch history
     String hatchRate = 'N/A';
     if (batchHistoryData.isNotEmpty) {
       final completedBatches = batchHistoryData.where((batch) => 
         batch['reason'] != null && batch['reason'].toString().toLowerCase().contains('hatch')).toList();
       
       if (completedBatches.isNotEmpty) {
-        // Calculate average hatch rate 
         double totalRate = 0.0;
         int validBatches = 0;
         
@@ -666,7 +573,6 @@ class _OverviewPageState extends State<OverviewPage> {
       }
     }
     
-    // Calculate next candling date from active batches
     String nextCandlingDate = 'No active batches';
     DateTime? earliestCandling;
     
@@ -676,7 +582,6 @@ class _OverviewPageState extends State<OverviewPage> {
       final DateTime now = DateTime.now();
       final int daysElapsed = now.difference(startDate).inDays;
       
-      // Check if batch is completed
       bool isCompleted = false;
       if (batchHistoryData.isNotEmpty) {
         final batchName = data['batchName'] ?? '';
@@ -685,7 +590,6 @@ class _OverviewPageState extends State<OverviewPage> {
       }
       
       if (!isCompleted) {
-        // Check for next candling day 
         for (int day in [7, 14, 18]) {
           if (daysElapsed < day) {
             final DateTime candlingDate = startDate.add(Duration(days: day));

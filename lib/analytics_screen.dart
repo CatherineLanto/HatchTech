@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
 import 'profile_screen.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   final String userName;
   final ValueNotifier<ThemeMode> themeNotifier;
-  final Map<String, Map<String, dynamic>> incubatorData;
-  final List<Map<String, dynamic>> batchHistory;
   final Function(String)? onNavigateToDashboard;
   final Function(Map<String, Map<String, dynamic>>)? onCandlingScheduled;
   final Function(int)? onDeleteBatch;
@@ -15,8 +15,6 @@ class AnalyticsScreen extends StatefulWidget {
     super.key,
     required this.userName,
     required this.themeNotifier,
-    required this.incubatorData,
-    this.batchHistory = const [],
     this.onNavigateToDashboard,
     this.onCandlingScheduled,
     this.onDeleteBatch,
@@ -28,70 +26,72 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
-  
-  // Track scheduled candling for each incubator
   Map<String, Map<String, dynamic>> scheduledCandling = {};
-  
-  // Local copy of batch history for reactive updates
-  late List<Map<String, dynamic>> localBatchHistory;
-  
+  Map<String, Map<String, dynamic>> incubatorData = {};
+  List<Map<String, dynamic>> batchHistory = [];
+
+  StreamSubscription? _incubatorSub;
+  StreamSubscription? _batchHistorySub;
+
   @override
   void initState() {
     super.initState();
-    localBatchHistory = List.from(widget.batchHistory);
-  }
-  
-  @override
-  void didUpdateWidget(AnalyticsScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.batchHistory != widget.batchHistory) {
+    _incubatorSub = FirebaseFirestore.instance.collection('incubators').snapshots().listen((snapshot) {
+      final Map<String, Map<String, dynamic>> fetchedData = {};
+      for (var doc in snapshot.docs) {
+        fetchedData[doc.id] = Map<String, dynamic>.from(doc.data());
+      }
       setState(() {
-        localBatchHistory = List.from(widget.batchHistory);
+        incubatorData = fetchedData;
       });
-      debugPrint('AnalyticsScreen batch history updated: ${localBatchHistory.length} batches');
-    }
+    });
+    _batchHistorySub = FirebaseFirestore.instance.collection('batchHistory').snapshots().listen((snapshot) {
+      final List<Map<String, dynamic>> fetchedHistory = [];
+      for (var doc in snapshot.docs) {
+        fetchedHistory.add(Map<String, dynamic>.from(doc.data()));
+      }
+      setState(() {
+        batchHistory = fetchedHistory;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _incubatorSub?.cancel();
+    _batchHistorySub?.cancel();
+    super.dispose();
   }
   
-  // Calculate overall hatch rate from completed batches
   double _calculateOverallHatchRate() {
-    if (localBatchHistory.isEmpty) return 0.0;
-    
+    if (batchHistory.isEmpty) return 0.0;
     double totalSuccessRate = 0.0;
     int completedBatches = 0;
-    
-    for (var batch in localBatchHistory) {
+    for (var batch in batchHistory) {
       if (batch['hatchedCount'] != null && batch['eggCount'] != null) {
         final double successRate = (batch['hatchedCount'] / batch['eggCount']) * 100;
         totalSuccessRate += successRate;
         completedBatches++;
       }
     }
-    
     return completedBatches > 0 ? totalSuccessRate / completedBatches : 0.0;
   }
 
   int _getTotalCompletedBatches() {
-    return localBatchHistory.length;
+    return batchHistory.length;
   }
 
   String _getNextCandlingDate() {
     DateTime? nextCandling;
-    
-    widget.incubatorData.forEach((name, data) {
+    incubatorData.forEach((name, data) {
       final int startDateMs = data['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
       final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
-      
       final List<int> candlingDays = [7, 14, 18];
       final DateTime now = DateTime.now();
       final int daysElapsed = now.difference(startDate).inDays;
-      
-      // Get candling status from data
       final Map<String, dynamic> candlingDates = data['candlingDates'] ?? {};
-      
       for (int day in candlingDays) {
-        // Check if this candling day hasn't been completed yet
         final bool candlingDone = candlingDates['$day'] == true;
-        
         if (daysElapsed < day && !candlingDone) {
           final DateTime candlingDate = startDate.add(Duration(days: day));
           if (nextCandling == null || candlingDate.isBefore(nextCandling!)) {
@@ -99,7 +99,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           }
           break;
         } else if (daysElapsed >= day && !candlingDone) {
-          // This candling is overdue
           final DateTime candlingDate = startDate.add(Duration(days: day));
           if (nextCandling == null || candlingDate.isBefore(nextCandling!)) {
             nextCandling = candlingDate;
@@ -107,7 +106,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         }
       }
     });
-    
     if (nextCandling != null) {
       return '${nextCandling!.day}/${nextCandling!.month}/${nextCandling!.year}';
     }
@@ -162,7 +160,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Available Incubators
                 Text(
                   'Select Incubator for Candling:',
                   style: const TextStyle(
@@ -172,13 +169,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // List of available incubators
                 Expanded(
                   child: ListView.builder(
                     shrinkWrap: true,
-                    itemCount: widget.incubatorData.length,
+                    itemCount: incubatorData.length,
                     itemBuilder: (context, index) {
-                      final entry = widget.incubatorData.entries.elementAt(index);
+                      final entry = incubatorData.entries.elementAt(index);
                       final incubatorName = entry.key;
                       final data = entry.value;
                       final batchName = data['batchName'] ?? 'Unknown Batch';
@@ -187,7 +183,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       final DateTime now = DateTime.now();
                       final int daysElapsed = now.difference(startDate).inDays;
 
-                      // Determine next candling day
                       final List<int> candlingDays = [7, 14, 18];
                       int? nextCandlingDay;
                       for (int day in candlingDays) {
@@ -197,7 +192,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                         }
                       }
 
-                      // Check if this candling is already scheduled
                       final String scheduleKey = nextCandlingDay != null 
                           ? '${incubatorName}_day_$nextCandlingDay' 
                           : '';
@@ -327,7 +321,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       return;
     }
 
-    // Check if candling is already scheduled for this incubator and day
     final String scheduleKey = '${incubatorName}_day_$nextCandlingDay';
     if (scheduledCandling.containsKey(scheduleKey)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -343,7 +336,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   void _showDatePicker(String incubatorName, String batchName, int candlingDay) {
-    final data = widget.incubatorData[incubatorName];
+  final data = incubatorData[incubatorName];
     final int startDateMs = data?['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
     final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
     final DateTime suggestedDate = startDate.add(Duration(days: candlingDay));
@@ -392,7 +385,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       widget.onCandlingScheduled!(Map.from(scheduledCandling));
     }
 
-    // Success confirmation
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Column(
@@ -435,7 +427,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         final double co2 = data['co2']?.toDouble() ?? 800.0;
         final bool eggTurning = data['eggTurning'] ?? true;
         final bool lighting = data['lighting'] ?? true;
-        
+
         final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
         final DateTime now = DateTime.now();
         final int daysElapsed = now.difference(startDate).inDays;
@@ -488,14 +480,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   [
                     'Started: ${startDate.day}/${startDate.month}/${startDate.year}',
                     'Day $daysElapsed of $incubationDays',
-                    daysRemaining == 0 ? 'Ready to hatch!' : 
+                    daysRemaining == 0 ? 'Ready to hatch!' :
                     daysRemaining == 1 ? '1 day left' : '$daysRemaining days remaining',
                   ],
                 ),
 
                 const SizedBox(height: 16),
 
-                // Environmental Conditions
                 _buildDetailSection(
                   'Environmental Conditions',
                   Icons.thermostat,
@@ -510,7 +501,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
                 const SizedBox(height: 16),
 
-                // Equipment Status
                 _buildDetailSection(
                   'Equipment Status',
                   Icons.settings,
@@ -521,26 +511,27 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   ],
                 ),
 
-                const SizedBox(height: 24),
-
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      _navigateToDashboard(incubatorName);
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                if (data['isActiveBatch'] == true) ...[
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _navigateToDashboard(incubatorName);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
+                      child: const Text('View Full Details'),
                     ),
-                    child: const Text('View Full Details'),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -614,10 +605,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                     ),
                     child: ProfileScreen(
-                      incubatorData: widget.incubatorData,
-                      selectedIncubator: widget.incubatorData.keys.isNotEmpty 
-                          ? widget.incubatorData.keys.first 
-                          : '',
+            incubatorData: incubatorData,
+            selectedIncubator: incubatorData.keys.isNotEmpty 
+              ? incubatorData.keys.first 
+              : '',
                       themeNotifier: widget.themeNotifier,
                       userName: widget.userName,
                       onUserNameChanged: () async {
@@ -721,7 +712,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             
             const SizedBox(height: 24),
             
-            // Active Batches Section
             Row(
               children: [
                 Text(
@@ -743,13 +733,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ),
             const SizedBox(height: 16),
             
-            ...widget.incubatorData.entries.map((entry) => 
+            ...incubatorData.entries.map((entry) => 
               _buildClickableActiveBatchCard(entry.key, entry.value, isDarkMode)
             ),
             
             const SizedBox(height: 24),
             
-            // Batch History Section
             Text(
               'Recent Batch History',
               style: Theme.of(context)
@@ -863,11 +852,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     
     Color statusColor = Colors.blue;
 
-    // Calculate progress percentage
     double progress = (daysElapsed / incubationDays).clamp(0.0, 1.0);
     
     return GestureDetector(
-      onTap: () => _showBatchDetails(incubatorName, data),
+      onTap: () {
+        final Map<String, dynamic> batchData = Map<String, dynamic>.from(data);
+        batchData['isActiveBatch'] = true;
+        _showBatchDetails(incubatorName, batchData);
+      },
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(16),
@@ -947,7 +939,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ),
             const SizedBox(height: 12),
             
-            // Progress Bar
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -987,7 +978,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   Widget _buildBatchHistoryList(bool isDarkMode) {
-    if (localBatchHistory.isEmpty) {
+    if (batchHistory.isEmpty) {
       return SizedBox(
         width: double.infinity,
         child: Container(
@@ -1031,127 +1022,133 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
 
     return Column(
-      children: localBatchHistory.map((batch) {
+      children: batchHistory.map((batch) {
         final int eggsStarted = batch['eggCount'] ?? 0;
         final int eggsHatched = batch['hatchedCount'] ?? 0;
         final double successRate = eggsStarted > 0 ? (eggsHatched / eggsStarted) * 100 : 0.0;
-        
-        Color rateColor = successRate >= 85 
-            ? Colors.green 
+
+        Color rateColor = successRate >= 85
+            ? Colors.green
             : (successRate >= 70 ? Colors.orange : Colors.red);
 
-        final DateTime? startDate = batch['startDate'] != null 
-            ? DateTime.fromMillisecondsSinceEpoch(batch['startDate']) 
+        final DateTime? startDate = batch['startDate'] != null
+            ? DateTime.fromMillisecondsSinceEpoch(batch['startDate'])
             : null;
-        final DateTime? endDate = batch['completedDate'] != null 
-            ? DateTime.fromMillisecondsSinceEpoch(batch['completedDate']) 
+        final DateTime? endDate = batch['completedDate'] != null
+            ? DateTime.fromMillisecondsSinceEpoch(batch['completedDate'])
             : null;
 
         final String completionReason = batch['completionReason'] ?? 'Completed';
-        final IconData reasonIcon = completionReason == 'Completed' 
+        final IconData reasonIcon = completionReason == 'Completed'
             ? Icons.check_circle
             : completionReason == 'Replaced'
             ? Icons.swap_horiz
             : Icons.stop_circle;
 
-        return Container(
-          margin: const EdgeInsets.only(bottom: 8),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: rateColor.withValues(alpha: 0.3),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: rateColor.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(
-                  reasonIcon,
-                  color: rateColor,
-                  size: 20,
-                ),
+        return InkWell(
+          onTap: () {
+            _showBatchDetails(batch['incubatorName'] ?? 'Unknown Incubator', batch);
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: rateColor.withValues(alpha: 0.3),
+                width: 1,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      batch['batchName'] ?? 'Unnamed Batch',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      '${batch['incubatorName'] ?? 'Unknown Incubator'} • $completionReason ${endDate != null ? '${endDate.day}/${endDate.month}/${endDate.year}' : 'Unknown Date'}',
-                      style: TextStyle(
-                        color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
-                        fontSize: 12,
-                      ),
-                    ),
-                    if (startDate != null && endDate != null)
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: rateColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    reasonIcon,
+                    color: rateColor,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        'Duration: ${endDate.difference(startDate).inDays} days',
+                        batch['batchName'] ?? 'Unnamed Batch',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        '${batch['incubatorName'] ?? 'Unknown Incubator'} • $completionReason ${endDate != null ? '${endDate.day}/${endDate.month}/${endDate.year}' : 'Unknown Date'}',
                         style: TextStyle(
-                          color: isDarkMode ? const Color(0xFF888888) : Colors.grey[500],
-                          fontSize: 10,
+                          color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                          fontSize: 12,
                         ),
                       ),
+                      if (startDate != null && endDate != null)
+                        Text(
+                          'Duration: ${endDate.difference(startDate).inDays} days',
+                          style: TextStyle(
+                            color: isDarkMode ? const Color(0xFF888888) : Colors.grey[500],
+                            fontSize: 10,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${successRate.toStringAsFixed(1)}%',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: rateColor,
+                      ),
+                    ),
+                    Text(
+                      '$eggsHatched/$eggsStarted eggs',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                      ),
+                    ),
                   ],
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    '${successRate.toStringAsFixed(1)}%',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                      color: rateColor,
-                    ),
+                const SizedBox(width: 8),
+                PopupMenuButton<String>(
+                  icon: Icon(
+                    Icons.more_vert,
+                    size: 20,
+                    color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
                   ),
-                  Text(
-                    '$eggsHatched/$eggsStarted eggs',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                  onSelected: (value) {
+                    if (value == 'delete') {
+                      _showDeleteBatchConfirmation(batch);
+                    }
+                  },
+                  itemBuilder: (BuildContext context) => [
+                    PopupMenuItem<String>(
+                      value: 'delete',
+                      child: Row(
+                        children: const [
+                          Icon(Icons.delete, color: Colors.red, size: 18),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(width: 8),
-              PopupMenuButton<String>(
-                icon: Icon(
-                  Icons.more_vert,
-                  size: 20,
-                  color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                  ],
                 ),
-                onSelected: (value) {
-                  if (value == 'delete') {
-                    _showDeleteBatchConfirmation(batch);
-                  }
-                },
-                itemBuilder: (BuildContext context) => [
-                  PopupMenuItem<String>(
-                    value: 'delete',
-                    child: Row(
-                      children: const [
-                        Icon(Icons.delete, color: Colors.red, size: 18),
-                        SizedBox(width: 8),
-                        Text('Delete', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         );
       }).toList(),
@@ -1161,7 +1158,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   void _showDeleteBatchConfirmation(Map<String, dynamic> batch) {
     showDialog(
       context: context,
-      builder: (BuildContext context) {
+      builder: (BuildContext dialogContext) {
         return AlertDialog(
           title: const Text('Delete Batch History'),
           content: Text(
@@ -1169,47 +1166,47 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(),
+              onPressed: () => Navigator.of(dialogContext).pop(),
               child: const Text('Cancel'),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                int index = -1;
-                for (int i = 0; i < localBatchHistory.length; i++) {
-                  final historyBatch = localBatchHistory[i];
-                  if (historyBatch['batchName'] == batch['batchName'] &&
-                      historyBatch['startDate'] == batch['startDate'] &&
-                      historyBatch['completedDate'] == batch['completedDate']) {
-                    index = i;
-                    break;
+              onPressed: () async {
+                final batchHistoryCollection = FirebaseFirestore.instance.collection('batchHistory');
+                final query = await batchHistoryCollection
+                  .where('batchName', isEqualTo: batch['batchName'])
+                  .where('startDate', isEqualTo: batch['startDate'])
+                  .where('completedDate', isEqualTo: batch['completedDate'])
+                  .get();
+                if (query.docs.isNotEmpty) {
+                  for (var doc in query.docs) {
+                    await doc.reference.delete();
                   }
-                }
-                
-                if (index != -1) {
-                  debugPrint('Deleting batch at index $index: ${batch['batchName']}');
-                  
-                  widget.onDeleteBatch?.call(index);
-                  
                   setState(() {
-                    localBatchHistory.removeAt(index);
+                    batchHistory.removeWhere((historyBatch) =>
+                      historyBatch['batchName'] == batch['batchName'] &&
+                      historyBatch['startDate'] == batch['startDate'] &&
+                      historyBatch['completedDate'] == batch['completedDate']);
                   });
-                  
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Batch deleted from history'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Batch deleted from history'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
                 } else {
                   debugPrint('Batch not found for deletion: ${batch['batchName']}');
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Error: Batch not found'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Error: Batch not found'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  }
                 }
+                Navigator.of(dialogContext).pop();
               },
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text('Delete'),

@@ -1,8 +1,9 @@
+// ignore_for_file: avoid_print
+
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
-import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'profile_screen.dart';
 import 'services/auth_service.dart';
@@ -36,6 +37,263 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
+  final Map<String, StreamSubscription<DatabaseEvent>> _sensorSubscriptions = {};
+
+  void listenToAllSensorData() {
+    _sensorSubscriptions.forEach((_, sub) => sub.cancel());
+    _sensorSubscriptions.clear();
+
+    incubatorData.forEach((incubatorId, data) {
+      final sensorId = data['sensorId'];
+      if (sensorId != null && sensorId is String && sensorId.isNotEmpty) {
+        final dbRef = FirebaseDatabase.instance.ref('HatchTech/$sensorId');
+        final sub = dbRef.onValue.listen((event) async {
+          final sensorData = event.snapshot.value as Map?;
+          if (sensorData != null) {
+            // Update Firestore incubator document with new sensor data
+            await FirebaseFirestore.instance.collection('incubators').doc(incubatorId).update({
+              'temperature': sensorData['temperature'] ?? 0.0,
+              'humidity': sensorData['humidity'] ?? 0.0,
+              'oxygen': sensorData['oxygen'] ?? 0.0,
+              'co2': sensorData['co2'] ?? 0.0,
+              'eggTurning': sensorData['eggTurning'] ?? false,
+              'lighting': sensorData['lighting'] ?? false,
+            });
+          }
+        });
+        _sensorSubscriptions[incubatorId] = sub;
+      }
+    });
+  }
+  void listenToIncubatorData() {
+    FirebaseFirestore.instance.collection('incubators').snapshots().listen((snapshot) {
+      final Map<String, Map<String, dynamic>> fetchedData = {};
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        if (data['startDate'] is Timestamp) {
+          data['startDate'] = (data['startDate'] as Timestamp).millisecondsSinceEpoch;
+        }
+        if (data['candlingDates'] is Map) {
+          data['candlingDates'] = Map<String, bool>.from(data['candlingDates']);
+        } else {
+          data['candlingDates'] = {'7': false, '14': false, '18': false};
+        }
+        fetchedData[doc.id] = Map<String, dynamic>.from(data);
+      }
+      if (mounted) {
+        setState(() {
+          incubatorData = fetchedData;
+          if (!incubatorData.containsKey(selectedIncubator)) {
+            selectedIncubator = incubatorData.keys.isNotEmpty ? incubatorData.keys.first : '';
+          }
+        });
+        listenToAllSensorData();
+      }
+    });
+  }
+  void showAddIncubatorDialog(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+  final TextEditingController nameController = TextEditingController();
+  final TextEditingController batchController = TextEditingController();
+  final TextEditingController eggCountController = TextEditingController(text: '12');
+  final TextEditingController breedController = TextEditingController();
+  final TextEditingController daysController = TextEditingController(text: '21');
+  final TextEditingController sensorIdController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : null,
+        title: Text(
+          'Add New Incubator',
+          style: TextStyle(color: isDarkMode ? Colors.white : null),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+                decoration: InputDecoration(
+                  labelText: 'Incubator Name *',
+                  labelStyle:
+                      TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : null),
+                  hintText: 'e.g., Incubator 1',
+                  hintStyle:
+                      TextStyle(color: isDarkMode ? const Color(0xFF666666) : null),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: sensorIdController,
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+                decoration: InputDecoration(
+                  labelText: 'Sensor ID *',
+                  labelStyle:
+                      TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : null),
+                  hintText: 'e.g., sensor_123',
+                  hintStyle:
+                      TextStyle(color: isDarkMode ? const Color(0xFF666666) : null),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: batchController,
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+                decoration: InputDecoration(
+                  labelText: 'Batch Name',
+                  labelStyle:
+                      TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : null),
+                  hintText: 'e.g., Batch A-001',
+                  hintStyle:
+                      TextStyle(color: isDarkMode ? const Color(0xFF666666) : null),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: eggCountController,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+                decoration: InputDecoration(
+                  labelText: 'Number of Eggs',
+                  labelStyle:
+                      TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : null),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: breedController,
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+                decoration: InputDecoration(
+                  labelText: 'Egg Breed/Type',
+                  labelStyle:
+                      TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : null),
+                  hintText: 'e.g., Rhode Island Red',
+                  hintStyle:
+                      TextStyle(color: isDarkMode ? const Color(0xFF666666) : null),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: daysController,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: isDarkMode ? Colors.white : null),
+                decoration: InputDecoration(
+                  labelText: 'Incubation Days',
+                  labelStyle:
+                      TextStyle(color: isDarkMode ? const Color(0xFFB0B0B0) : null),
+                  hintText: '21 for chickens, 28 for ducks',
+                  hintStyle:
+                      TextStyle(color: isDarkMode ? const Color(0xFF666666) : null),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final String name = nameController.text.trim();
+              final String batchName = batchController.text.trim();
+              final int eggCount = int.tryParse(eggCountController.text) ?? 0;
+              final String breed = breedController.text.trim();
+              final int days = int.tryParse(daysController.text) ?? 21;
+
+              if (name.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Incubator name is required')),
+                );
+                return;
+              }
+              if (incubatorData.containsKey(name)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Incubator "$name" already exists')),
+                );
+                return;
+              }
+              if (eggCount <= 0) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Egg count must be greater than zero')),
+                );
+                return;
+              }
+
+              final now = DateTime.now();
+
+              final newIncubatorData = {
+                'temperature': 0.0,
+                'humidity': 0.0,
+                'oxygen': 0.0,
+                'co2': 0.0,
+                'eggTurning': false,
+                'lighting': false,
+                'batchName': batchName.isEmpty ? 'No batch' : batchName,
+                'startDate': now.millisecondsSinceEpoch,
+                'incubationDays': days,
+                'eggCount': eggCount,
+                'eggBreed': breed.isEmpty ? 'Mixed' : breed,
+                'sensorId': sensorIdController.text.trim(),
+                'candlingDates': {
+                  '7': false,
+                  '14': false,
+                  '18': false,
+                },
+                'fertilityRate': null,
+                'viableEggs': eggCount,
+                'hatchedCount': null,
+              };
+
+              final prevIncubator = incubatorData[name];
+              if (prevIncubator != null && prevIncubator['batchName'] != null && prevIncubator['batchName'].toString().isNotEmpty) {
+                final prevBatch = Map<String, dynamic>.from(prevIncubator);
+                prevBatch['completedDate'] = now.millisecondsSinceEpoch;
+                prevBatch['completionReason'] = 'Replaced';
+                final batchHistoryCollection = FirebaseFirestore.instance.collection('batchHistory');
+                final query = await batchHistoryCollection
+                  .where('batchName', isEqualTo: prevBatch['batchName'])
+                  .where('startDate', isEqualTo: prevBatch['startDate'])
+                  .where('incubatorName', isEqualTo: name)
+                  .get();
+                for (var doc in query.docs) {
+                  await doc.reference.delete();
+                }
+                await batchHistoryCollection.add(prevBatch);
+              }
+
+              await FirebaseFirestore.instance
+                  .collection('incubators')
+                  .doc(name)
+                  .set(newIncubatorData)
+                  .catchError((e) {
+                    print('Firestore error: $e');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Firestore error: $e')),
+                    );
+                  });
+
+              setState(() {
+                incubatorData[name] = newIncubatorData;
+                selectedIncubator = name;
+              });
+
+              Navigator.pop(context);
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Incubator "$name" added')),
+              );
+            },
+            child: const Text('Add Incubator'),
+          ),
+        ],
+      ),
+    );
+  }
   String selectedIncubator = 'Incubator 1';
   bool showWarning = false;
   List<Map<String, dynamic>> currentAlerts = [];
@@ -49,15 +307,14 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   late AnimationController _warningAnimationController;
   late Animation<double> _warningAnimation;
 
-  final Map<String, Map<String, dynamic>> incubatorData = {};
+  Map<String, Map<String, dynamic>> incubatorData = {};
+
   List<Map<String, dynamic>> batchHistory = []; 
 
   @override
   void initState() {
     super.initState();
-    
     currentUserName = widget.userName;
-    
     _warningAnimationController = AnimationController(
       duration: const Duration(milliseconds: 500),
       vsync: this,
@@ -66,103 +323,9 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       parent: _warningAnimationController,
       curve: Curves.elasticOut,
     );
-    
-    if (widget.incubatorData != null && widget.incubatorData!.isNotEmpty) {
-      incubatorData.addAll(widget.incubatorData!);
-    } else {
-      final now = DateTime.now();
-      incubatorData.addAll({
-        'Incubator 1': {
-          'temperature': 37.5, 
-          'humidity': 50.0, 
-          'oxygen': 20.5, 
-          'co2': 800.0, 
-          'eggTurning': true, 
-          'lighting': true,
-          'batchName': 'Batch A-001',
-          'startDate': now.subtract(const Duration(days: 12)).millisecondsSinceEpoch,
-          'incubationDays': 21,
-          'eggCount': 24,
-          'eggBreed': 'Rhode Island Red',
-          'candlingDates': {
-            '7': false,  
-            '14': false, 
-            '18': false, 
-          },
-          'fertilityRate': null,
-          'viableEggs': 24,
-          'hatchedCount': null,
-        },
-        'Incubator 2': {
-          'temperature': 37.8, 
-          'humidity': 55.0, 
-          'oxygen': 20.0, 
-          'co2': 750.0, 
-          'eggTurning': false, 
-          'lighting': false,
-          'batchName': 'Batch B-002',
-          'startDate': now.subtract(const Duration(days: 7)).millisecondsSinceEpoch,
-          'incubationDays': 21,
-          'eggCount': 18,
-          'eggBreed': 'Leghorn',
-          'candlingDates': {
-            '7': true,  
-            '14': false, 
-            '18': false, 
-          },
-          'fertilityRate': 85.0,
-          'viableEggs': 15, 
-          'hatchedCount': null,
-        },
-      });
-    }
-    
   selectedIncubator = widget.incubatorName;
-  // Listen to Firebase Realtime Database for sensor data
-  listenToSensorData();
+  listenToIncubatorData();
   }
-
-  // Removed updateSensorData: now handled by Firebase listener
-  void listenToSensorData() {
-    final dbRef = FirebaseDatabase.instance.ref('HatchTech/Incubator1');
-    dbRef.onValue.listen(
-      (event) {
-        try {
-          final data = event.snapshot.value as Map?;
-          print('Received sensor data: $data'); // Debug print
-          if (data != null) {
-            setState(() {
-              incubatorData['Incubator 1'] = Map<String, dynamic>.from({
-                ...incubatorData['Incubator 1'] ?? {},
-                ...data,
-                'temperature': (data['temperature'] is num)
-                    ? (data['temperature'] as num).toDouble()
-                    : (incubatorData['Incubator 1']?['temperature'] ?? 0.0),
-                'humidity': (data['humidity'] is num)
-                    ? (data['humidity'] as num).toDouble()
-                    : (incubatorData['Incubator 1']?['humidity'] ?? 0.0),
-                'oxygen': (data['oxygen'] is num)
-                    ? (data['oxygen'] as num).toDouble()
-                    : (incubatorData['Incubator 1']?['oxygen'] ?? 0.0),
-                'co2': (data['co2'] is num)
-                    ? (data['co2'] as num).toDouble()
-                    : (incubatorData['Incubator 1']?['co2'] ?? 0.0),
-              });
-            });
-            checkAlerts();
-            _notifyDataChanged();
-          }
-        } catch (e, stack) {
-          print('Error in sensor listener: $e\n$stack');
-        }
-      },
-      onError: (error) {
-        print('Firebase listener error: $error');
-      },
-    );
-  }
-
-  // Removed unused _clampValue method
 
   void checkAlerts() {
     final now = DateTime.now();
@@ -260,33 +423,12 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     }
   }
 
-  // Batch History Management Methods
-  // Removed unused _loadBatchHistory method
-
-  Future<void> _saveBatchHistory() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final historyJson = jsonEncode(batchHistory);
-      await prefs.setString('batch_history', historyJson);
-      
-      if (widget.onBatchHistoryChanged != null) {
-        widget.onBatchHistoryChanged!(List.from(batchHistory));
-      }
-    } catch (e) {
-      debugPrint('Error saving batch history: $e');
-    }
-  }
-
   void _addBatchToHistory(Map<String, dynamic> batchData, String incubatorName, {String reason = 'Completed'}) {
     final historyEntry = Map<String, dynamic>.from(batchData);
     historyEntry['incubatorName'] = incubatorName;
     historyEntry['completedDate'] = DateTime.now().millisecondsSinceEpoch;
-    historyEntry['completionReason'] = reason; 
-    
-    setState(() {
-      batchHistory.insert(0, historyEntry); 
-    });
-    _saveBatchHistory();
+    historyEntry['completionReason'] = reason;
+    FirebaseFirestore.instance.collection('batchHistory').add(historyEntry);
   }
 
   void addNewIncubator() {
@@ -322,55 +464,59 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   }
 
   void showRenameDialog(BuildContext context, String incubatorKey) {
-  final TextEditingController controller = TextEditingController(text: incubatorKey);
-  final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final TextEditingController controller = TextEditingController(text: incubatorKey);
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-  showDialog(
-    context: context,
-    builder: (context) => AlertDialog(
-      backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : null,
-      title: Text(
-        'Rename Incubator',
-        style: TextStyle(
-          color: isDarkMode ? Colors.white : null,
-        ),
-      ),
-      content: TextField(
-        controller: controller,
-        style: TextStyle(
-          color: isDarkMode ? Colors.white : null,
-        ),
-        decoration: InputDecoration(
-          labelText: 'New Incubator Name',
-          labelStyle: TextStyle(
-            color: isDarkMode ? const Color(0xFFB0B0B0) : null,
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : null,
+        title: Text(
+          'Rename Incubator',
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : null,
           ),
         ),
+        content: TextField(
+          controller: controller,
+          style: TextStyle(
+            color: isDarkMode ? Colors.white : null,
+          ),
+          decoration: InputDecoration(
+            labelText: 'New Incubator Name',
+            labelStyle: TextStyle(
+              color: isDarkMode ? const Color(0xFFB0B0B0) : null,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              String newName = controller.text.trim();
+              if (newName.isNotEmpty && !incubatorData.containsKey(newName)) {
+                // Copy incubator data to new document in Firestore
+                final incubatorInfo = Map<String, dynamic>.from(incubatorData[incubatorKey]!);
+                await FirebaseFirestore.instance.collection('incubators').doc(newName).set(incubatorInfo);
+                await FirebaseFirestore.instance.collection('incubators').doc(incubatorKey).delete();
+                setState(() {
+                  incubatorData[newName] = incubatorData.remove(incubatorKey)!;
+                  if (selectedIncubator == incubatorKey) {
+                    selectedIncubator = newName;
+                  }
+                });
+                _notifyDataChanged();
+                Navigator.pop(context);
+              }
+            },
+            child: const Text('Rename'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: () {
-            String newName = controller.text.trim();
-            if (newName.isNotEmpty && !incubatorData.containsKey(newName)) {
-              setState(() {
-                incubatorData[newName] = incubatorData.remove(incubatorKey)!;
-                if (selectedIncubator == incubatorKey) {
-                  selectedIncubator = newName;
-                }
-              });
-              _notifyDataChanged();
-              Navigator.pop(context);
-            }
-          },
-          child: const Text('Rename'),
-        ),
-      ],
-    ),
-  );
+    );
   }
 
   @override
@@ -388,16 +534,69 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     if (!incubatorData.containsKey(selectedIncubator)) {
       if (incubatorData.isNotEmpty) {
         selectedIncubator = incubatorData.keys.first;
-      } else {
-        return Scaffold(
-          appBar: AppBar(title: const Text('Dashboard')),
-          body: const Center(child: Text('No incubators available')),
-        );
       }
     }
 
-  // Always get the latest data for the selected incubator
-  final selected = incubatorData[selectedIncubator]!;
+    if (incubatorData.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Dashboard'),
+          backgroundColor: Colors.blueAccent,
+          foregroundColor: Colors.white,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.person),
+              onPressed: () async {
+                await showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => DraggableScrollableSheet(
+                    initialChildSize: 0.9,
+                    minChildSize: 0.5,
+                    maxChildSize: 0.95,
+                    builder: (context, scrollController) => Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                      ),
+                      child: ProfileScreen(
+                        incubatorData: incubatorData,
+                        selectedIncubator: selectedIncubator,
+                        themeNotifier: widget.themeNotifier,
+                        userName: currentUserName,
+                        onUserNameChanged: () async {
+                          final user = AuthService.currentUser;
+                          if (user != null) {
+                            // ...existing code...
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('No incubators found. Please add one to get started.'),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: () => showAddIncubatorDialog(context),
+                icon: const Icon(Icons.add),
+                label: const Text('Add Incubator'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final selected = incubatorData[selectedIncubator]!;
 
     return PopScope(
       onPopInvokedWithResult: (didPop, result) {
@@ -406,196 +605,194 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         }
       },
       child: Scaffold(
-      appBar: AppBar(
-        title: const Text('Dashboard'),
-        backgroundColor: Colors.blueAccent,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () async {
-              await showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: Colors.transparent,
-                builder: (context) => DraggableScrollableSheet(
-                  initialChildSize: 0.9,
-                  minChildSize: 0.5,
-                  maxChildSize: 0.95,
-                  builder: (context, scrollController) => Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                      borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                    ),
-                    child: ProfileScreen(
-                      incubatorData: incubatorData,
-                      selectedIncubator: selectedIncubator,
-                      themeNotifier: widget.themeNotifier,
-                      userName: currentUserName,
-                      onUserNameChanged: () async {
-                        // Refresh username from Firebase
-                        final user = AuthService.currentUser;
-                        if (user != null) {
-                          final newUserName = user.displayName ?? 'User';
-                          setState(() {
-                            currentUserName = newUserName;
-                          });
-                          widget.onUserNameChanged?.call(newUserName);
-                        }
-                      },
+        appBar: AppBar(
+          title: const Text('Dashboard'),
+          backgroundColor: Colors.blueAccent,
+          foregroundColor: Colors.white,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.person),
+              onPressed: () async {
+                await showModalBottomSheet(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (context) => DraggableScrollableSheet(
+                    initialChildSize: 0.9,
+                    minChildSize: 0.5,
+                    maxChildSize: 0.95,
+                    builder: (context, scrollController) => Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).scaffoldBackgroundColor,
+                        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                      ),
+                      child: ProfileScreen(
+                        incubatorData: incubatorData,
+                        selectedIncubator: selectedIncubator,
+                        themeNotifier: widget.themeNotifier,
+                        userName: currentUserName,
+                        onUserNameChanged: () async {
+                          final user = AuthService.currentUser;
+                          if (user != null) {
+                            final newUserName = user.displayName ?? 'User';
+                            setState(() {
+                              currentUserName = newUserName;
+                            });
+                            widget.onUserNameChanged?.call(newUserName);
+                          }
+                        },
+                      ),
                     ),
                   ),
-                ),
-              );
+                );
 
-              setState(() {
-                if (!incubatorData.containsKey(selectedIncubator)) {
-                  selectedIncubator = incubatorData.keys.first;
+                setState(() {
+                  if (!incubatorData.containsKey(selectedIncubator)) {
+                    selectedIncubator = incubatorData.keys.first;
+                  }
+                  checkAlerts();
+                });
+
+                if (widget.onDataChanged != null) {
+                  widget.onDataChanged!(Map.from(incubatorData));
                 }
-                checkAlerts();
-              });
-              
-              if (widget.onDataChanged != null) {
-                widget.onDataChanged!(Map.from(incubatorData));
-              }
-            },
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Focus(
-                        focusNode: dropdownFocusNode,
-                        onFocusChange: (hasFocus) {
-                          setState(() {
-                            isDropdownOpen = hasFocus;
-                          });
-                        },
-                        child: DropdownButtonFormField<String>(
-                          value: selectedIncubator,
-                          items: incubatorData.keys.map((key) {
-                            return DropdownMenuItem(
-                              value: key,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Text(key),
-                                  if (isDropdownOpen)
-                                  IconButton(
-                                    icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
-                                    onPressed: () {
-                                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                                        showRenameDialog(context, key);
-                                      });
-                                    },
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          selectedItemBuilder: (context) {
-                            return incubatorData.keys.map((key) => Text(key)).toList();
+              },
+            ),
+          ],
+        ),
+        body: Stack(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Focus(
+                          focusNode: dropdownFocusNode,
+                          onFocusChange: (hasFocus) {
+                            setState(() {
+                              isDropdownOpen = hasFocus;
+                            });
                           },
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() {
-                                selectedIncubator = value;
-                                showWarning = false;
-                                checkAlerts();
-                              });
-                            }
-                          },
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    ElevatedButton.icon(
-                      onPressed: addNewIncubator,
-                      icon: const Icon(Icons.add),
-                      label: const Text("Add"),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blueAccent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        GridView.count(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 8,
-                          children: [
-                            buildSensorCard('Temperature', selected['temperature'], Icons.thermostat, max: 40),
-                            buildSensorCard('Humidity', selected['humidity'], Icons.water_drop, max: 100),
-                            buildSensorCard('Oxygen', selected['oxygen'], Icons.air, max: 25),
-                            buildSensorCard('CO₂', selected['co2'], Icons.cloud, max: 1200),
-                            buildToggleCard('Egg Turning', selected['eggTurning'], (val) {
-                              setState(() {
-                                incubatorData[selectedIncubator]!['eggTurning'] = val;
-                              });
-                            }),
-                            buildToggleCard('Lighting', selected['lighting'], (val) {
-                              setState(() {
-                                incubatorData[selectedIncubator]!['lighting'] = val;
-                              });
-                            }),
-                          ],
-                        ),
-                        const SizedBox(height: 2), 
-                        buildBatchTrackingCard(selected),
-                        const SizedBox(height: 12),
-                        // Start New Batch Button
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () => showStartNewBatchDialog(context),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Start New Batch'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4CAF50),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
+                          child: DropdownButtonFormField<String>(
+                            value: selectedIncubator,
+                            items: incubatorData.keys.map((key) {
+                              return DropdownMenuItem(
+                                value: key,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(key),
+                                    if (isDropdownOpen)
+                                      IconButton(
+                                        icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
+                                        onPressed: () {
+                                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                                            showRenameDialog(context, key);
+                                          });
+                                        },
+                                      ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            selectedItemBuilder: (context) {
+                              return incubatorData.keys.map((key) => Text(key)).toList();
+                            },
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() {
+                                  selectedIncubator = value;
+                                  showWarning = false;
+                                  checkAlerts();
+                                });
+                              }
+                            },
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 16), 
-                      ],
+                      ),
+                      const SizedBox(width: 10),
+                      ElevatedButton.icon(
+                        onPressed: () => showAddIncubatorDialog(context),
+                        icon: const Icon(Icons.add),
+                        label: const Text("Add"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blueAccent,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          GridView.count(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 8,
+                            children: [
+                              buildSensorCard('Temperature', (selected['temperature'] as num?)?.toDouble() ?? 0.0, Icons.thermostat, max: 40),
+                              buildSensorCard('Humidity', (selected['humidity'] as num?)?.toDouble() ?? 0.0, Icons.water_drop, max: 100),
+                              buildSensorCard('Oxygen', (selected['oxygen'] as num?)?.toDouble() ?? 0.0, Icons.air, max: 25),
+                              buildSensorCard('CO₂', (selected['co2'] as num?)?.toDouble() ?? 0.0, Icons.cloud, max: 1200),
+                              buildToggleCard('Egg Turning', selected['eggTurning'] ?? false, (val) {
+                                setState(() {
+                                  incubatorData[selectedIncubator]!['eggTurning'] = val;
+                                });
+                              }),
+                              buildToggleCard('Lighting', selected['lighting'] ?? false, (val) {
+                                setState(() {
+                                  incubatorData[selectedIncubator]!['lighting'] = val;
+                                });
+                              }),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          buildBatchTrackingCard(selected),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () => showStartNewBatchDialog(context),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Start New Batch'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF4CAF50),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16), 
+                        ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          if (showWarning) 
-            Positioned(
-              top: 80,
-              left: 0,
-              right: 0,
-              child: buildWarningDialog(),
-            ),
-        ],
+            if (showWarning) 
+              Positioned(
+                top: 80,
+                left: 0,
+                right: 0,
+                child: buildWarningDialog(),
+              ),
+          ],
+        ),
       ),
-    )
     );
   }
 
@@ -949,11 +1146,11 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
               ),
             ),
             const SizedBox(height: 8),
-            _buildCandlingRowWithScheduled('Day 7:', data['candlingDates']['7'] ?? false, isDarkMode, 7, selectedIncubator),
+            _buildCandlingRowWithScheduled('Day 7:', (data['candlingDates'] ?? {})['7'] ?? false, isDarkMode, 7, selectedIncubator),
             const SizedBox(height: 4),
-            _buildCandlingRowWithScheduled('Day 14:', data['candlingDates']['14'] ?? false, isDarkMode, 14, selectedIncubator),
+            _buildCandlingRowWithScheduled('Day 14:', (data['candlingDates'] ?? {})['14'] ?? false, isDarkMode, 14, selectedIncubator),
             const SizedBox(height: 4),
-            _buildCandlingRowWithScheduled('Day 18:', data['candlingDates']['18'] ?? false, isDarkMode, 18, selectedIncubator),
+            _buildCandlingRowWithScheduled('Day 18:', (data['candlingDates'] ?? {})['18'] ?? false, isDarkMode, 18, selectedIncubator),
             const SizedBox(height: 8),
             if (data['fertilityRate'] != null)
               _buildDetailRow('Fertility Rate:', '${data['fertilityRate'].toStringAsFixed(1)}%', isDarkMode),
@@ -1087,13 +1284,23 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final String newBatchName = batchController.text.trim();
               final int newDays = int.tryParse(daysController.text) ?? 21;
               final int newEggCount = int.tryParse(eggCountController.text) ?? 0;
               final String newBreed = breedController.text.trim();
               
               if (newBatchName.isNotEmpty && newDays > 0 && newEggCount >= 0) {
+                // Update Firestore document
+                await FirebaseFirestore.instance
+                  .collection('incubators')
+                  .doc(selectedIncubator)
+                  .update({
+                    'batchName': newBatchName,
+                    'incubationDays': newDays,
+                    'eggCount': newEggCount,
+                    'eggBreed': newBreed.isEmpty ? 'Unknown' : newBreed,
+                  });
                 setState(() {
                   incubatorData[selectedIncubator]!['batchName'] = newBatchName;
                   incubatorData[selectedIncubator]!['incubationDays'] = newDays;
@@ -1101,7 +1308,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                   incubatorData[selectedIncubator]!['eggBreed'] = newBreed.isEmpty ? 'Unknown' : newBreed;
                 });
                 _notifyDataChanged();
-                Navigator.pop(context); 
+                Navigator.pop(context);
                 showBatchDialog(context, incubatorData[selectedIncubator]!);
               }
             },
@@ -1342,32 +1549,43 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               final String batchName = batchController.text.trim();
               final int eggCount = int.tryParse(eggCountController.text) ?? 0;
               final String breed = breedController.text.trim();
               final int days = int.tryParse(daysController.text) ?? 21;
               
               if (batchName.isNotEmpty && eggCount > 0) {
-                setState(() {
-                  incubatorData[selectedIncubator]!['batchName'] = batchName;
-                  incubatorData[selectedIncubator]!['eggCount'] = eggCount;
-                  incubatorData[selectedIncubator]!['eggBreed'] = breed.isEmpty ? 'Mixed' : breed;
-                  incubatorData[selectedIncubator]!['incubationDays'] = days;
-                  incubatorData[selectedIncubator]!['startDate'] = DateTime.now().millisecondsSinceEpoch;
-                  incubatorData[selectedIncubator]!['viableEggs'] = eggCount; // Start with all eggs viable
-                  incubatorData[selectedIncubator]!['candlingDates'] = {
+                final prevBatch = incubatorData[selectedIncubator];
+                if (prevBatch != null && prevBatch['batchName'] != null && prevBatch['batchName'].toString().isNotEmpty) {
+                  final now = DateTime.now();
+                  final historyEntry = Map<String, dynamic>.from(prevBatch);
+                  historyEntry['incubatorName'] = selectedIncubator;
+                  historyEntry['completedDate'] = now.millisecondsSinceEpoch;
+                  historyEntry['completionReason'] = 'Replaced';
+                  await FirebaseFirestore.instance.collection('batchHistory').add(historyEntry);
+                }
+                final updateData = <String, dynamic>{
+                  'batchName': batchName,
+                  'eggCount': eggCount,
+                  'eggBreed': breed.isEmpty ? 'Mixed' : breed,
+                  'incubationDays': days,
+                  'startDate': DateTime.now().millisecondsSinceEpoch,
+                  'viableEggs': eggCount,
+                  'candlingDates': {
                     '7': false,
                     '14': false,
                     '18': false,
-                  };
-                  incubatorData[selectedIncubator]!['fertilityRate'] = null;
-                  incubatorData[selectedIncubator]!['hatchedCount'] = null;
+                  },
+                  'fertilityRate': null,
+                  'hatchedCount': null,
+                };
+                await FirebaseFirestore.instance.collection('incubators').doc(selectedIncubator).update(updateData);
+                setState(() {
+                  incubatorData[selectedIncubator]!.addAll(updateData);
                 });
                 _notifyDataChanged();
                 Navigator.pop(context);
-                
-                // Show success message
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text('New batch "$batchName" started successfully!'),
@@ -1794,20 +2012,30 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                 ),
               ),
               ElevatedButton(
-                onPressed: () {
-                  setState(() {
-                    final String incubatorKey = selectedIncubator;
-                    if (incubatorData.containsKey(incubatorKey)) {
-                      incubatorData[incubatorKey]!['candlingDates'] = Map<String, dynamic>.from(data['candlingDates'] ?? {});
-                      if (data['fertilityRate'] != null) {
-                        incubatorData[incubatorKey]!['fertilityRate'] = data['fertilityRate'];
-                      }
-                      if (data['viableEggs'] != null) {
-                        incubatorData[incubatorKey]!['viableEggs'] = data['viableEggs'];
-                      }
+                onPressed: () async {
+                  final String incubatorKey = selectedIncubator;
+                  if (incubatorData.containsKey(incubatorKey)) {
+                    final updateData = <String, dynamic>{
+                      'candlingDates': Map<String, dynamic>.from(data['candlingDates'] ?? {}),
+                    };
+                    if (data['fertilityRate'] != null) {
+                      updateData['fertilityRate'] = data['fertilityRate'];
                     }
+                    if (data['viableEggs'] != null) {
+                      updateData['viableEggs'] = data['viableEggs'];
+                    }
+                    await FirebaseFirestore.instance.collection('incubators').doc(incubatorKey).update(updateData);
+                    setState(() {
+                      incubatorData[incubatorKey]!['candlingDates'] = updateData['candlingDates'];
+                      if (updateData['fertilityRate'] != null) {
+                        incubatorData[incubatorKey]!['fertilityRate'] = updateData['fertilityRate'];
+                      }
+                      if (updateData['viableEggs'] != null) {
+                        incubatorData[incubatorKey]!['viableEggs'] = updateData['viableEggs'];
+                      }
+                    });
                     _notifyDataChanged();
-                  });
+                  }
                   Navigator.pop(context); 
                   showBatchDialog(context, incubatorData[selectedIncubator]!);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -1971,7 +2199,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                 
                 final double successRate = (hatchedCount / (data['eggCount'] ?? 1)) * 100;
                 
-                // Show success message
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
