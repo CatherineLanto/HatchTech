@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
 import 'signup_screen.dart';
+import 'auth_wrapper.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, required this.themeNotifier});
@@ -93,7 +94,14 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (result['success']) {
-      // Login successful, navigation is handled by AuthWrapper
+      // Login successful, replace stack with AuthWrapper for guaranteed rebuild
+      if (!mounted) return;
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => AuthWrapper(themeNotifier: widget.themeNotifier),
+        ),
+        (route) => false,
+      );
     } else {
       if (mounted) {
         setState(() {

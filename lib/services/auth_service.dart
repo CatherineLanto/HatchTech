@@ -12,6 +12,7 @@ class AuthService {
     required String email,
     required String password,
     required String username,
+    required String role,
   }) async {
     try {
       // Check if username already exists
@@ -38,6 +39,7 @@ class AuthService {
         'username': username,
         'username_lower': username.toLowerCase(),
         'email': email,
+        'role': role,
         'created_at': FieldValue.serverTimestamp(),
         'last_login': FieldValue.serverTimestamp(),
       });

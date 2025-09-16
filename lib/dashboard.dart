@@ -18,11 +18,12 @@ class Dashboard extends StatefulWidget {
   final Function(String)? onUserNameChanged;
   final Function(Map<String, Map<String, dynamic>>)? onScheduleChanged;
   final Function(List<Map<String, dynamic>>)? onBatchHistoryChanged;
+  final String? userRole;
   
   const Dashboard({
-    super.key, 
-    required this.incubatorName, 
-    required this.userName, 
+    super.key,
+    required this.incubatorName,
+    required this.userName,
     required this.themeNotifier,
     this.incubatorData,
     this.scheduledCandlingData,
@@ -30,6 +31,7 @@ class Dashboard extends StatefulWidget {
     this.onUserNameChanged,
     this.onScheduleChanged,
     this.onBatchHistoryChanged,
+    this.userRole,
   });
 
   @override
@@ -37,6 +39,10 @@ class Dashboard extends StatefulWidget {
 }
 
 class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
+  bool get isOwnerOrAdmin {
+    final roleLower = (widget.userRole ?? '').toLowerCase();
+    return roleLower.contains('owner') || roleLower.contains('admin');
+  }
   final Map<String, StreamSubscription<DatabaseEvent>> _sensorSubscriptions = {};
 
   void listenToAllSensorData() {
@@ -585,11 +591,12 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
             children: [
               const Text('No incubators found. Please add one to get started.'),
               const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: () => showAddIncubatorDialog(context),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Incubator'),
-              ),
+              if (isOwnerOrAdmin)
+                ElevatedButton.icon(
+                  onPressed: () => showAddIncubatorDialog(context),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Incubator'),
+                ),
             ],
           ),
         ),
@@ -685,7 +692,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
                                     Text(key),
-                                    if (isDropdownOpen)
+                                    if (isDropdownOpen && isOwnerOrAdmin)
                                       IconButton(
                                         icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
                                         onPressed: () {
@@ -717,15 +724,16 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      ElevatedButton.icon(
-                        onPressed: () => showAddIncubatorDialog(context),
-                        icon: const Icon(Icons.add),
-                        label: const Text("Add"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      if (isOwnerOrAdmin)
+                        ElevatedButton.icon(
+                          onPressed: () => showAddIncubatorDialog(context),
+                          icon: const Icon(Icons.add),
+                          label: const Text("Add"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueAccent,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
                         ),
-                      ),
                     ],
                   ),
                   const SizedBox(height: 20),

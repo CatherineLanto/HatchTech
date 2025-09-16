@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
+import 'services/invite_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -28,6 +29,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isLoading = false;
   String originalLoginName = '';
   String userEmail = '';
+  String? userRole;
+  String? generatedInviteCode;
+  String? selectedInviteRole;
 
   @override
   void initState() {
@@ -43,6 +47,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() {
           originalLoginName = userData['username'] ?? widget.userName;
           userEmail = userData['email'] ?? '';
+          userRole = userData['role'] ?? '';
           _nameController.text = originalLoginName;
         });
       }
@@ -114,7 +119,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    bool isDark = widget.themeNotifier.value == ThemeMode.dark;
+  bool isDark = widget.themeNotifier.value == ThemeMode.dark;
+  final roleLower = (userRole ?? '').toLowerCase();
+  bool isOwnerOrAdmin = roleLower.contains('owner') || roleLower.contains('admin');
+  bool isManager = roleLower.contains('manager');
 
     return Scaffold(
       appBar: AppBar(
@@ -145,6 +153,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
+            // Invite code generator for owner/admin (no role selection, above log out)
+            ...[],
             CircleAvatar(
               radius: 60,
               backgroundColor: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent,
@@ -240,7 +250,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 child: CircularProgressIndicator(),
               ),
 
-            const SizedBox(height: 30),
+            const SizedBox(height: 10),
 
             Card(
               shape: RoundedRectangleBorder(
@@ -258,36 +268,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const Divider(height: 0),
-                  ListTile(
-                    leading: Icon(Icons.devices,
-                        color: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent),
-                    title: const Text('Manage Incubators'),
-                    onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.vertical(top: Radius.circular(20)),
-                        ),
-                        builder: (_) => IncubatorManager(
-                          incubatorData: widget.incubatorData,
-                          onDelete: (name) async {
-                            // Delete incubator from Firestore
-                            await FirebaseFirestore.instance.collection('incubators').doc(name).delete();
-                            Navigator.pop(context);
-                            Navigator.pop(context, _nameController.text.trim());
-                          },
-                        ),
-                      );
-                    },
-                  ),
+                  // Only owners/managers can manage incubators (case-insensitive, substring match)
+                  if (isOwnerOrAdmin || isManager)
+                    ListTile(
+                      leading: Icon(Icons.devices,
+                          color: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent),
+                      title: const Text('Manage Incubators'),
+                      onTap: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius:
+                                BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          builder: (_) => IncubatorManager(
+                            incubatorData: widget.incubatorData,
+                            onDelete: (name) async {
+                              // Delete incubator from Firestore
+                              await FirebaseFirestore.instance.collection('incubators').doc(name).delete();
+                              Navigator.pop(context);
+                              Navigator.pop(context, _nameController.text.trim());
+                            },
+                          ),
+                        );
+                      },
+                    ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 30),
-
+            const SizedBox(height: 10),
+            if (isOwnerOrAdmin) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    setState(() { generatedInviteCode = null; });
+                    final code = await InviteService.createInviteCode('user');
+                    setState(() { generatedInviteCode = code; });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Generate Invite Code', style: TextStyle(fontSize: 16)),
+                ),
+              ),
+              if (generatedInviteCode != null) ...[
+                const SizedBox(height: 12),
+                Text('Invite Code:', style: TextStyle(fontWeight: FontWeight.bold)),
+                SelectableText(generatedInviteCode!, style: TextStyle(fontSize: 20, color: Colors.blueAccent)),
+              ],
+              const SizedBox(height: 10),
+            ],
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -302,9 +339,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ),
                 onPressed: () async {
                   await _saveUserData();
-                  
                   await AuthService.signOut();
-                  
                   if (mounted) {
                     Navigator.of(context).pop();
                   }

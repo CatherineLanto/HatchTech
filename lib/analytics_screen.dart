@@ -10,6 +10,7 @@ class AnalyticsScreen extends StatefulWidget {
   final Function(Map<String, Map<String, dynamic>>)? onCandlingScheduled;
   final Function(int)? onDeleteBatch;
   final VoidCallback? onBatchHistoryChanged;
+  final String? userRole;
 
   const AnalyticsScreen({
     super.key,
@@ -19,6 +20,7 @@ class AnalyticsScreen extends StatefulWidget {
     this.onCandlingScheduled,
     this.onDeleteBatch,
     this.onBatchHistoryChanged,
+    this.userRole,
   });
 
   @override
@@ -26,6 +28,10 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
+  bool get isOwnerOrAdmin {
+    final roleLower = (widget.userRole ?? '').toLowerCase();
+    return roleLower.contains('owner') || roleLower.contains('admin');
+  }
   Map<String, Map<String, dynamic>> scheduledCandling = {};
   Map<String, Map<String, dynamic>> incubatorData = {};
   List<Map<String, dynamic>> batchHistory = [];
@@ -1123,30 +1129,31 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   ],
                 ),
                 const SizedBox(width: 8),
-                PopupMenuButton<String>(
-                  icon: Icon(
-                    Icons.more_vert,
-                    size: 20,
-                    color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
-                  ),
-                  onSelected: (value) {
-                    if (value == 'delete') {
-                      _showDeleteBatchConfirmation(batch);
-                    }
-                  },
-                  itemBuilder: (BuildContext context) => [
-                    PopupMenuItem<String>(
-                      value: 'delete',
-                      child: Row(
-                        children: const [
-                          Icon(Icons.delete, color: Colors.red, size: 18),
-                          SizedBox(width: 8),
-                          Text('Delete', style: TextStyle(color: Colors.red)),
-                        ],
-                      ),
+                if (isOwnerOrAdmin)
+                  PopupMenuButton<String>(
+                    icon: Icon(
+                      Icons.more_vert,
+                      size: 20,
+                      color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
                     ),
-                  ],
-                ),
+                    onSelected: (value) {
+                      if (value == 'delete') {
+                        _showDeleteBatchConfirmation(batch);
+                      }
+                    },
+                    itemBuilder: (BuildContext context) => [
+                      PopupMenuItem<String>(
+                        value: 'delete',
+                        child: Row(
+                          children: const [
+                            Icon(Icons.delete, color: Colors.red, size: 18),
+                            SizedBox(width: 8),
+                            Text('Delete', style: TextStyle(color: Colors.red)),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),

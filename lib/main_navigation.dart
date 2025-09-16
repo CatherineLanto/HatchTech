@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hatchtech/services/auth_service.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'overview_screen.dart';
@@ -20,6 +21,7 @@ class MainNavigation extends StatefulWidget {
 }
 
 class _MainNavigationState extends State<MainNavigation> {
+  String? userRole;
   int _currentIndex = 0;
   late String currentUserName;
   String selectedIncubatorName = '';
@@ -31,6 +33,14 @@ class _MainNavigationState extends State<MainNavigation> {
   void initState() {
     super.initState();
     currentUserName = widget.userName;
+    _loadUserRole();
+  }
+
+  Future<void> _loadUserRole() async {
+    final userData = await AuthService.getUserData();
+    setState(() {
+      userRole = userData?['role'] ?? '';
+    });
   }
 
   void _updateSharedData(Map<String, Map<String, dynamic>> newData) {
@@ -119,11 +129,12 @@ class _MainNavigationState extends State<MainNavigation> {
             onUserNameChanged: _updateUserName,
             onNavigateToDashboard: _navigateToDashboard,
             onNavigateToAnalytics: _navigateToAnalytics,
+            userRole: userRole,
           ),
           Dashboard(
-            key: ValueKey('dashboard_${currentUserName}_$selectedIncubatorName'), 
-            incubatorName: selectedIncubatorName.isNotEmpty 
-                ? selectedIncubatorName 
+            key: ValueKey('dashboard_${currentUserName}_$selectedIncubatorName'),
+            incubatorName: selectedIncubatorName.isNotEmpty
+                ? selectedIncubatorName
                 : (sharedIncubatorData.isNotEmpty ? sharedIncubatorData.keys.first : 'Incubator 1'),
             userName: currentUserName,
             themeNotifier: widget.themeNotifier,
@@ -133,15 +144,17 @@ class _MainNavigationState extends State<MainNavigation> {
             onUserNameChanged: _updateUserName,
             onScheduleChanged: _updateScheduledCandling,
             onBatchHistoryChanged: _updateBatchHistory,
+            userRole: userRole,
           ),
           AnalyticsScreen(
-            key: ValueKey('analytics_$currentUserName'), 
+            key: ValueKey('analytics_$currentUserName'),
             userName: currentUserName,
             themeNotifier: widget.themeNotifier,
             onNavigateToDashboard: _navigateToDashboard,
             onCandlingScheduled: _updateScheduledCandling,
             onDeleteBatch: _deleteBatchFromHistory,
             onBatchHistoryChanged: _refreshBatchHistory,
+            userRole: userRole,
           ),
         ],
       ),

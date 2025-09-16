@@ -13,6 +13,7 @@ class OverviewPage extends StatefulWidget {
   final Function(String)? onUserNameChanged;
   final Function(String)? onNavigateToDashboard;
   final VoidCallback? onNavigateToAnalytics;
+  final String? userRole;
 
   const OverviewPage({
     super.key,
@@ -24,6 +25,7 @@ class OverviewPage extends StatefulWidget {
     this.onUserNameChanged,
     this.onNavigateToDashboard,
     this.onNavigateToAnalytics,
+    this.userRole,
   });
 
   @override
@@ -31,6 +33,10 @@ class OverviewPage extends StatefulWidget {
 }
 
 class _OverviewPageState extends State<OverviewPage> {
+  bool get isOwnerOrAdmin {
+    final roleLower = (widget.userRole ?? '').toLowerCase();
+    return roleLower.contains('owner') || roleLower.contains('admin');
+  }
   StreamSubscription? _incubatorSub;
   late String userName;
   bool isNewUser = false;

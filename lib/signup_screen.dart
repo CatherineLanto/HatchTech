@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
+import 'services/invite_service.dart';
 import 'login_screen.dart';
+import 'auth_wrapper.dart';
 
 class SignUpScreen extends StatefulWidget {
   final ValueNotifier<ThemeMode> themeNotifier;
@@ -23,6 +25,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   
   String? errorMessage;
   bool hasError = false;
+    String _selectedRole = 'Owner/Admin';
+    final _inviteCode = TextEditingController();
 
   @override
   void initState() {
@@ -44,6 +48,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _email.dispose();
     _password.dispose();
     _confirmPassword.dispose();
+    _inviteCode.dispose();
     super.dispose();
   }
 
@@ -59,9 +64,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
   void _showSuccessDialog() {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
+    if (!mounted) return;
     showDialog(
       context: context,
-      barrierDismissible: false, 
+      barrierDismissible: false,
       builder: (context) {
         return Dialog(
           backgroundColor: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
@@ -109,7 +115,15 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: () {
-                      Navigator.pop(context);
+                      if (!mounted) return;
+                      // Close dialog and replace stack with AuthWrapper for guaranteed rebuild
+                      Navigator.of(context, rootNavigator: true).pop();
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (_) => AuthWrapper(themeNotifier: widget.themeNotifier),
+                        ),
+                        (route) => false,
+                      );
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueAccent,
@@ -137,7 +151,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
     if (_username.text.trim().isEmpty || 
         _email.text.trim().isEmpty || 
         _password.text.trim().isEmpty || 
-        _confirmPassword.text.trim().isEmpty) {
+        _confirmPassword.text.trim().isEmpty ||
+        (_selectedRole != 'Owner/Admin' && _inviteCode.text.trim().isEmpty)) {
       setState(() {
         hasError = true;
         errorMessage = "Please fill in all fields";
@@ -169,6 +184,20 @@ class _SignUpScreenState extends State<SignUpScreen> {
       return;
     }
 
+    String roleToAssign = _selectedRole;
+    if (_selectedRole != 'Owner/Admin') {
+      // Validate invite code and get role
+      final inviteRole = await InviteService.validateInviteCode(_inviteCode.text.trim());
+      if (inviteRole == null) {
+        setState(() {
+          hasError = true;
+          errorMessage = "Invalid or used invite code.";
+        });
+        return;
+      }
+      roleToAssign = inviteRole;
+    }
+
     setState(() {
       isLoading = true;
       hasError = false;
@@ -179,7 +208,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
       email: _email.text.trim(),
       password: _password.text,
       username: _username.text.trim(),
+      role: roleToAssign,
     );
+
+    // Mark invite code as used if not Owner/Admin and registration succeeded
+    if (_selectedRole != 'Owner/Admin' && result['success']) {
+      await InviteService.markCodeUsed(_inviteCode.text.trim());
+    }
 
     if (mounted) {
       setState(() {
@@ -307,6 +342,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ),
                     child: Column(
                       children: [
+                        // Role selection dropdown
+                        DropdownButtonFormField<String>(
+                          value: _selectedRole,
+                          decoration: _inputDecoration("Select Role", Icons.admin_panel_settings),
+                          items: [
+                            DropdownMenuItem(value: 'Owner/Admin', child: Text('Owner/Admin')),
+                            DropdownMenuItem(value: 'Other User', child: Text('Other User')),
+                          ],
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedRole = value!;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        // Invite code input (only for non-Owner/Admin)
+                        if (_selectedRole != 'Owner/Admin')
+                          TextField(
+                            controller: _inviteCode,
+                            decoration: _inputDecoration("Invite Code", Icons.vpn_key),
+                          ),
+                        if (_selectedRole != 'Owner/Admin') const SizedBox(height: 16),
                         TextField(
                           controller: _username,
                           decoration: _inputDecoration("Username", Icons.person),
