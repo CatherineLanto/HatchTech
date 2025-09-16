@@ -38,9 +38,11 @@ class _MainNavigationState extends State<MainNavigation> {
 
   Future<void> _loadUserRole() async {
     final userData = await AuthService.getUserData();
-    setState(() {
-      userRole = userData?['role'] ?? '';
-    });
+    if (mounted) {
+      setState(() {
+        userRole = userData?['role'] ?? '';
+      });
+    }
   }
 
   void _updateSharedData(Map<String, Map<String, dynamic>> newData) {
