@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
 import 'services/invite_service.dart';
+import 'user_management_screen.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -24,6 +28,8 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  File? _newAvatarFile;
+  String? _avatarUrl;
   late TextEditingController _nameController;
   bool _isEditing = false;
   bool _isLoading = false;
@@ -36,8 +42,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.userName);
-    _loadFirebaseUserData();
+  _nameController = TextEditingController(text: widget.userName);
+  _loadFirebaseUserData();
   }
 
   Future<void> _loadFirebaseUserData() async {
@@ -49,6 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           userEmail = userData['email'] ?? '';
           userRole = userData['role'] ?? '';
           _nameController.text = originalLoginName;
+          _avatarUrl = userData['avatarUrl'] as String?;
         });
       }
     } catch (e) {
@@ -61,11 +68,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   void dispose() {
-    _nameController.dispose();
+  _nameController.dispose();
     super.dispose();
   }
 
   Future<void> _saveUserData() async {
+    // Avatar logic: if new avatar picked and save pressed, upload and update Firestore
+    if (_newAvatarFile != null) {
+      final userId = AuthService.currentUser?.uid;
+      if (userId != null) {
+        final ref = FirebaseStorage.instance.ref().child('avatars/$userId.jpg');
+        await ref.putFile(_newAvatarFile!);
+        final url = await ref.getDownloadURL();
+        await FirebaseFirestore.instance.collection('users').doc(userId).update({'avatarUrl': url});
+        setState(() {
+          _avatarUrl = url;
+          _newAvatarFile = null;
+        });
+      }
+    }
     if (!_isEditing) return;
 
     setState(() {
@@ -73,9 +94,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     final newUsername = _nameController.text.trim();
-    
     bool usernameChanged = newUsername != originalLoginName;
-
     if (usernameChanged && newUsername.isNotEmpty) {
       final result = await AuthService.updateUserProfile(
         username: newUsername,
@@ -155,14 +174,65 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             // Invite code generator for owner/admin (no role selection, above log out)
             ...[],
-            CircleAvatar(
-              radius: 60,
-              backgroundColor: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent,
-              child: const Icon(
-                Icons.person,
-                size: 60,
-                color: Colors.white,
-              ),
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                CircleAvatar(
+                  radius: 60,
+                  backgroundColor: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent,
+                  backgroundImage: _newAvatarFile != null
+                      ? FileImage(_newAvatarFile!)
+                      : (_avatarUrl != null ? NetworkImage(_avatarUrl!) : null) as ImageProvider?,
+                  child: (_newAvatarFile == null && _avatarUrl == null)
+                      ? const Icon(Icons.person, size: 60, color: Colors.white)
+                      : null,
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: InkWell(
+                    onTap: () async {
+                      final picker = ImagePicker();
+                      final picked = await picker.pickImage(source: ImageSource.gallery);
+                      if (picked != null) {
+                        setState(() {
+                          _newAvatarFile = File(picked.path);
+                        });
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                      ),
+                      child: const Icon(Icons.edit, color: Colors.blueAccent, size: 24),
+                    ),
+                  ),
+                ),
+                if (_newAvatarFile != null)
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          _newAvatarFile = null;
+                        });
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 4)],
+                        ),
+                        child: const Icon(Icons.close, color: Colors.red, size: 24),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 24),
 
@@ -268,7 +338,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const Divider(height: 0),
-                  // Only owners/managers can manage incubators (case-insensitive, substring match)
+                  if (isOwnerOrAdmin) ...[
+                    ListTile(
+                      leading: Icon(Icons.group,
+                          color: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent),
+                      title: const Text('User Management'),
+                      onTap: () {
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          shape: const RoundedRectangleBorder(
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                          ),
+                          builder: (_) => SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.85,
+                            child: const UserManagementScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    const Divider(height: 0),
+                  ],
                   if (isOwnerOrAdmin || isManager)
                     ListTile(
                       leading: Icon(Icons.devices,

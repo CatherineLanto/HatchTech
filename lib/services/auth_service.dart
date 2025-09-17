@@ -2,6 +2,40 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuthService {
+  // Update user email in Firebase Auth and Firestore
+  static Future<Map<String, dynamic>> updateUserEmail({
+    required String userId,
+    required String newEmail,
+  }) async {
+    try {
+      // Get user by userId
+      if (currentUser != null && currentUser!.uid == userId) {
+        // If editing self, send verification before updating Firebase Auth email
+        await currentUser!.verifyBeforeUpdateEmail(newEmail);
+      }
+      // Update Firestore email
+      await _firestore.collection('users').doc(userId).update({'email': newEmail});
+      return {'success': true, 'message': 'Email updated successfully!'};
+    } on FirebaseAuthException catch (e) {
+      String message;
+      switch (e.code) {
+        case 'email-already-in-use':
+          message = 'An account already exists for that email.';
+          break;
+        case 'invalid-email':
+          message = 'Please enter a valid email address.';
+          break;
+        case 'requires-recent-login':
+          message = 'Please re-authenticate and try again.';
+          break;
+        default:
+          message = 'An error occurred. Please try again.';
+      }
+      return {'success': false, 'message': message};
+    } catch (e) {
+      return {'success': false, 'message': 'Failed to update email. Please try again.'};
+    }
+  }
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 

@@ -240,7 +240,7 @@ class _OverviewPageState extends State<OverviewPage> {
                       onUserNameChanged: () async {
                         // Refresh user data from Firebase
                         final userData = await AuthService.getUserData();
-                        if (userData != null && mounted) {
+                        if (mounted && userData != null) {
                           setState(() {
                             userName = userData['username'] ?? userName;
                           });
@@ -252,10 +252,12 @@ class _OverviewPageState extends State<OverviewPage> {
                 ),
               );
 
-              setState(() {
-                incubators = List<String>.from(incubatorData.keys);
-                _updateCounts();
-              });
+              if (mounted) {
+                setState(() {
+                  incubators = List<String>.from(incubatorData.keys);
+                  _updateCounts();
+                });
+              }
             },
           ),
         ],
