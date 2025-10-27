@@ -1,16 +1,53 @@
+// ignore_for_file: avoid_print
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'auth_wrapper.dart';
+import 'services/auth_service.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
+
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // You can handle background messages here (e.g., log, analytics)
+  print('Handling a background message: ${message.messageId}');
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Set up background message handler
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // Request notification permissions (iOS, Android 13+)
+  await FirebaseMessaging.instance.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
+
+  // Get the device token for sending targeted notifications
+  final fcmToken = await FirebaseMessaging.instance.getToken();
+  print('FCM Token: $fcmToken');
+
+  // Save FCM token to Firestore for current user (if signed in)
+  // This requires AuthService.currentUser and FirebaseFirestore
+  try {
+    final user = AuthService.currentUser;
+    if (user != null && fcmToken != null) {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({'fcmToken': fcmToken});
+    }
+  } catch (e) {
+    print('Error saving FCM token: $e');
+  }
+
   runApp(const HatchTechApp());
 }
 

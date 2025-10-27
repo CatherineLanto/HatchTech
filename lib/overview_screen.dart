@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
+import 'package:another_flushbar/flushbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import 'profile_screen.dart';
@@ -33,6 +34,22 @@ class OverviewPage extends StatefulWidget {
 }
 
 class _OverviewPageState extends State<OverviewPage> {
+  DateTime? _lastHatchNotification;
+  DateTime? _lastWarningNotification;
+  final Map<String, DateTime> _lastCandlingNotification = {};
+  // Modern notification helper
+  void showModernNotification(String message, {Color? color, IconData? icon}) {
+  if (!mounted) return;
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    Flushbar(
+      message: message,
+      duration: const Duration(seconds: 3),
+      flushbarPosition: FlushbarPosition.TOP,
+      backgroundColor: color ?? Colors.blueAccent,
+      icon: icon != null ? Icon(icon, color: Colors.white) : null,
+    ).show(context);
+  });
+  }
   bool get isOwnerOrAdmin {
     final roleLower = (widget.userRole ?? '').toLowerCase();
     return roleLower.contains('owner') || roleLower.contains('admin');
@@ -60,11 +77,15 @@ class _OverviewPageState extends State<OverviewPage> {
       for (var doc in snapshot.docs) {
         fetchedData[doc.id] = Map<String, dynamic>.from(doc.data());
       }
-      setState(() {
-        incubatorData = fetchedData;
-        incubators = incubatorData.keys.toList();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            incubatorData = fetchedData;
+            incubators = incubatorData.keys.toList();
+          });
+          _updateCounts();
+        }
       });
-      _updateCounts();
     });
     
     _loadFirebaseUserData();
@@ -135,6 +156,30 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
   void _updateCounts() {
+    // Hatching date notifications (<=2 days left)
+    final now = DateTime.now();
+    for (final name in incubators) {
+      final data = _currentIncubatorData[name];
+      if (data != null) {
+        final int startDateMs = data['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
+        final int incubationDays = data['incubationDays'] ?? 21;
+        final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
+        final int daysElapsed = now.difference(startDate).inDays;
+        final int daysRemaining = (incubationDays - daysElapsed).clamp(0, incubationDays);
+        if (daysRemaining <= 2 && daysRemaining > 0) {
+          if (_lastHatchNotification == null || now.difference(_lastHatchNotification!).inHours > 6) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              showModernNotification(
+                "$name: Only $daysRemaining day(s) left until hatching!",
+                color: Colors.amber,
+                icon: Icons.egg,
+              );
+            });
+            _lastHatchNotification = now;
+          }
+        }
+      }
+    }
     int normal = 0;
     int warnings = 0;
     normalIncubators.clear();
@@ -167,10 +212,26 @@ class _OverviewPageState extends State<OverviewPage> {
       }
     });
 
-    setState(() {
-      normalCount = normal;
-      warningCount = warnings;
-    });
+    if (mounted) {
+      setState(() {
+        normalCount = normal;
+        warningCount = warnings;
+      });
+      // Throttle warning notifications to avoid spamming
+      if (warningCount > 0) {
+        final now = DateTime.now();
+        if (_lastWarningNotification == null || now.difference(_lastWarningNotification!).inSeconds > 15) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            showModernNotification(
+              "$warningCount incubator(s) need attention!",
+              color: Colors.redAccent,
+              icon: Icons.warning,
+            );
+          });
+          _lastWarningNotification = now;
+        }
+      }
+    }
   }
 
 
@@ -580,6 +641,39 @@ class _OverviewPageState extends State<OverviewPage> {
         }
       }
     }
+    // Candling notification logic
+    final now = DateTime.now();
+    dataSource.forEach((name, data) {
+      final int startDateMs = data['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
+      final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
+  // Removed unused daysElapsed variable
+      bool isCompleted = false;
+      if (batchHistoryData.isNotEmpty) {
+        final batchName = data['batchName'] ?? '';
+        isCompleted = batchHistoryData.any((batch) => 
+          batch['batchName'] == batchName && batch['reason'] != null);
+      }
+      if (!isCompleted) {
+        for (int day in [7, 14, 18]) {
+          final DateTime candlingDate = startDate.add(Duration(days: day));
+          final int daysToCandling = candlingDate.difference(now).inDays;
+          if (daysToCandling <= 2 && daysToCandling >= 0) {
+            final lastNotify = _lastCandlingNotification['${name}_$day'];
+            if (lastNotify == null || now.difference(lastNotify).inHours > 6) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                showModernNotification(
+                  "$name: Candling scheduled in $daysToCandling day(s) (Day $day)",
+                  color: Colors.lightBlue,
+                  icon: Icons.lightbulb,
+                );
+              });
+              _lastCandlingNotification['${name}_$day'] = now;
+            }
+            break;
+          }
+        }
+      }
+    });
     
     String nextCandlingDate = 'No active batches';
     DateTime? earliestCandling;

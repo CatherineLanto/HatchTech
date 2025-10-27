@@ -756,10 +756,16 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                                 setState(() {
                                   incubatorData[selectedIncubator]!['eggTurning'] = val;
                                 });
+                                FirebaseFirestore.instance.collection('incubators').doc(selectedIncubator).update({
+                                  'eggTurning': val,
+                                });
                               }),
                               buildToggleCard('Lighting', selected['lighting'] ?? false, (val) {
                                 setState(() {
                                   incubatorData[selectedIncubator]!['lighting'] = val;
+                                });
+                                FirebaseFirestore.instance.collection('incubators').doc(selectedIncubator).update({
+                                  'lighting': val,
                                 });
                               }),
                             ],
