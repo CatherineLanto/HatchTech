@@ -951,10 +951,11 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   Widget buildSensorCard(String label, double value, IconData icon, {double max = 100}) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     double percentage = value / max;
-    Color barColor = (label == 'Humidity' && (value < 35 || value > 65)) ||
-            (label == 'Temperature' && (value < 36 || value > 39)) ||
-            (label == 'Oxygen' && value < 19.0) ||
-            (label == 'CO₂' && value > 900)
+    Color barColor = 
+            (label == 'Humidity' && (value < 45 || value > 70)) ||
+            (label == 'Temperature' && (value < 37.0 || value > 38.0)) ||
+            (label == 'Oxygen' && value < 18.5) ||
+            (label == 'CO₂' && value > 5000)
         ? (isDarkMode ? const Color(0xFFFF5252) : Colors.red)
         : (isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue);
 
