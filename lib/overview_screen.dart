@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
-import 'package:another_flushbar/flushbar.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import 'profile_screen.dart';
+import 'utils/analytics_helper.dart';
+import 'services/notification_service.dart';
 
 class OverviewPage extends StatefulWidget {
   final String userName;
@@ -39,22 +40,23 @@ class _OverviewPageState extends State<OverviewPage> {
   final Map<String, DateTime> _lastCandlingNotification = {};
   // Modern notification helper
   void showModernNotification(String message, {Color? color, IconData? icon}) {
-  if (!mounted) return;
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    Flushbar(
-      message: message,
-      duration: const Duration(seconds: 3),
-      flushbarPosition: FlushbarPosition.TOP,
-      backgroundColor: color ?? Colors.blueAccent,
-      icon: icon != null ? Icon(icon, color: Colors.white) : null,
-    ).show(context);
-  });
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationService().show(
+        context,
+        message,
+        color: color ?? Colors.blueAccent,
+        icon: icon,
+      );
+    });
   }
   bool get isOwnerOrAdmin {
     final roleLower = (widget.userRole ?? '').toLowerCase();
     return roleLower.contains('owner') || roleLower.contains('admin');
   }
   StreamSubscription? _incubatorSub;
+  StreamSubscription? _batchHistorySub;
+  List<Map<String, dynamic>> _localBatchHistory = [];
   late String userName;
   bool isNewUser = false;
   int normalCount = 0;
@@ -87,6 +89,19 @@ class _OverviewPageState extends State<OverviewPage> {
         }
       });
     });
+    // Listen to batch history similar to AnalyticsScreen so Overview reflects same data
+    _batchHistorySub = FirebaseFirestore.instance.collection('batchHistory').snapshots().listen((snapshot) {
+      final List<Map<String, dynamic>> fetchedHistory = [];
+      for (var doc in snapshot.docs) {
+        fetchedHistory.add(Map<String, dynamic>.from(doc.data()));
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _localBatchHistory = fetchedHistory;
+        });
+      });
+    });
     
     _loadFirebaseUserData();
   }
@@ -94,6 +109,7 @@ class _OverviewPageState extends State<OverviewPage> {
   @override
   void dispose() {
   _incubatorSub?.cancel();
+  _batchHistorySub?.cancel();
     super.dispose();
   }
 
@@ -611,36 +627,15 @@ class _OverviewPageState extends State<OverviewPage> {
 
   Widget _buildAnalyticsSummaryCard(bool isDarkMode) {
     final dataSource = widget.sharedIncubatorData ?? incubatorData;
-    final batchHistoryData = widget.batchHistory ?? [];
+    final batchHistoryData = (widget.batchHistory != null && widget.batchHistory!.isNotEmpty)
+        ? widget.batchHistory!
+        : _localBatchHistory;
+    // import helper
+    // avoid unused import lint by referencing the helper methods below
+    // (actual import added at top of file)
     
-    String hatchRate = 'N/A';
-    if (batchHistoryData.isNotEmpty) {
-      final completedBatches = batchHistoryData.where((batch) => 
-        batch['reason'] != null && batch['reason'].toString().toLowerCase().contains('hatch')).toList();
-      
-      if (completedBatches.isNotEmpty) {
-        double totalRate = 0.0;
-        int validBatches = 0;
-        
-        for (var batch in completedBatches) {
-          if (batch['hatchRate'] != null) {
-            totalRate += (batch['hatchRate'] as num).toDouble();
-            validBatches++;
-          } else if (batch['eggsHatched'] != null && batch['totalEggs'] != null) {
-            final hatched = (batch['eggsHatched'] as num).toDouble();
-            final total = (batch['totalEggs'] as num).toDouble();
-            if (total > 0) {
-              totalRate += (hatched / total) * 100;
-              validBatches++;
-            }
-          }
-        }
-        
-        if (validBatches > 0) {
-          hatchRate = '${(totalRate / validBatches).toStringAsFixed(1)}%';
-        }
-      }
-    }
+    final double rateValue = calculateOverallHatchRate(batchHistoryData);
+    final String hatchRate = rateValue > 0 ? '${rateValue.toStringAsFixed(1)}%' : 'N/A';
     // Candling notification logic
     final now = DateTime.now();
     dataSource.forEach((name, data) {
@@ -675,38 +670,8 @@ class _OverviewPageState extends State<OverviewPage> {
       }
     });
     
-    String nextCandlingDate = 'No active batches';
-    DateTime? earliestCandling;
-    
-    dataSource.forEach((name, data) {
-      final int startDateMs = data['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
-      final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
-      final DateTime now = DateTime.now();
-      final int daysElapsed = now.difference(startDate).inDays;
-      
-      bool isCompleted = false;
-      if (batchHistoryData.isNotEmpty) {
-        final batchName = data['batchName'] ?? '';
-        isCompleted = batchHistoryData.any((batch) => 
-          batch['batchName'] == batchName && batch['reason'] != null);
-      }
-      
-      if (!isCompleted) {
-        for (int day in [7, 14, 18]) {
-          if (daysElapsed < day) {
-            final DateTime candlingDate = startDate.add(Duration(days: day));
-            if (earliestCandling == null || candlingDate.isBefore(earliestCandling!)) {
-              earliestCandling = candlingDate;
-            }
-            break;
-          }
-        }
-      }
-    });
-    
-    if (earliestCandling != null) {
-      nextCandlingDate = '${earliestCandling!.day}/${earliestCandling!.month}/${earliestCandling!.year}';
-    }
+    // Use shared helper to determine next candling date
+    String nextCandlingDate = getNextCandlingDate(dataSource, batchHistoryData);
 
     return Card(
       color: isDarkMode ? const Color(0xFF0F1B2D) : Colors.blue.shade50,

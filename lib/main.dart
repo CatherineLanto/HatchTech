@@ -8,9 +8,11 @@ import 'auth_wrapper.dart';
 import 'services/auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'services/notification_service.dart';
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 
+@pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   // You can handle background messages here (e.g., log, analytics)
@@ -25,6 +27,10 @@ void main() async {
 
   // Set up background message handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // NOTE: initialize the local notification plugin from the app isolate
+  // (we do this in the app widget's initState below) to avoid MissingPlugin
+  // exceptions that can happen if plugins aren't registered yet.
 
   // Request notification permissions (iOS, Android 13+)
   await FirebaseMessaging.instance.requestPermission(
@@ -51,8 +57,48 @@ void main() async {
   runApp(const HatchTechApp());
 }
 
-class HatchTechApp extends StatelessWidget {
+class HatchTechApp extends StatefulWidget {
   const HatchTechApp({super.key});
+
+  @override
+  State<HatchTechApp> createState() => _HatchTechAppState();
+}
+
+class _HatchTechAppState extends State<HatchTechApp> {
+  @override
+  void initState() {
+    super.initState();
+
+    // Initialize local notifications and set up message listeners here.
+    // Wrap initialize in try/catch so a MissingPluginException doesn't crash the app.
+    FcmLocalNotificationService.instance.init().catchError((err) {
+      // MissingPluginException often means the app was hot-reloaded without a
+      // full restart. Recommend full restart if this occurs.
+      print('Local notification init error: $err');
+    });
+
+    // Foreground messages
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      // Show a local notification when a message arrives in foreground
+      FcmLocalNotificationService.instance.showNotificationFromRemoteMessage(message).catchError((err) {
+        print('Show notification error: $err');
+      });
+    });
+
+    // When the app is opened from a terminated state via a notification
+    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
+      if (message != null) {
+        // handle navigation based on message.data if needed
+        print('App opened from terminated state by notification: ${message.messageId}');
+      }
+    });
+
+    // When app is in background and opened by tapping notification
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      print('Notification caused app to open: ${message.messageId}');
+      // handle navigation
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

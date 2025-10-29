@@ -11,11 +11,14 @@ plugins {
 android {
     namespace = "com.example.hatchtech"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // Use a specific NDK version required by some plugins (matched to plugin requirements)
+    ndkVersion = "27.0.12077973"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+        // Enable core library desugaring required by some dependencies
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -44,4 +47,9 @@ android {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Required for core library desugaring (java.time and other APIs on older runtimes)
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
 }

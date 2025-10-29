@@ -56,14 +56,36 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         final sub = dbRef.onValue.listen((event) async {
           final sensorData = event.snapshot.value as Map?;
           if (sensorData != null) {
-            // Update Firestore incubator document with new sensor data
+            // Normalize values: prefer Arduino keys ('motor'/'light') but fall back to Firestore keys ('eggTurning'/'lighting').
+            // This allows existing devices that send motor/light (0/1) to work and keeps Firestore fields boolean.
+            dynamic rawEgg = sensorData['motor'] ?? sensorData['eggTurning'];
+            bool eggTurning = false;
+            if (rawEgg is bool) {
+              eggTurning = rawEgg;
+            } else if (rawEgg is num) {
+              eggTurning = rawEgg != 0;
+            } else if (rawEgg is String) {
+              eggTurning = rawEgg == '1' || rawEgg.toLowerCase() == 'true';
+            }
+
+            dynamic rawLight = sensorData['light'] ?? sensorData['lighting'];
+            bool lighting = false;
+            if (rawLight is bool) {
+              lighting = rawLight;
+            } else if (rawLight is num) {
+              lighting = rawLight != 0;
+            } else if (rawLight is String) {
+              lighting = rawLight == '1' || rawLight.toLowerCase() == 'true';
+            }
+
+            // Update Firestore incubator document with new sensor data using normalized booleans.
             await FirebaseFirestore.instance.collection('incubators').doc(incubatorId).update({
               'temperature': sensorData['temperature'] ?? 0.0,
               'humidity': sensorData['humidity'] ?? 0.0,
               'oxygen': sensorData['oxygen'] ?? 0.0,
               'co2': sensorData['co2'] ?? 0.0,
-              'eggTurning': sensorData['eggTurning'] ?? false,
-              'lighting': sensorData['lighting'] ?? false,
+              'eggTurning': eggTurning,
+              'lighting': lighting,
             });
           }
         });
@@ -315,6 +337,9 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
 
   Map<String, Map<String, dynamic>> incubatorData = {};
 
+  // Track pending toggle writes to avoid duplicate concurrent operations
+  final Map<String, bool> _togglePending = {};
+
   List<Map<String, dynamic>> batchHistory = []; 
 
   @override
@@ -429,12 +454,107 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     }
   }
 
-  void _addBatchToHistory(Map<String, dynamic> batchData, String incubatorName, {String reason = 'Completed'}) {
+  Future<void> _toggleAndSend({required String firestoreKey, required String realtimeKey, required bool value}) async {
+    final key = '${selectedIncubator}_$firestoreKey';
+    if (_togglePending[key] == true) return; // already working
+    _togglePending[key] = true;
+
+    try {
+    // mark pending and rebuild so UI disables the switch and shows spinner
+    setState(() {
+      _togglePending[key] = true;
+      incubatorData[selectedIncubator]?[firestoreKey] = value;
+    });
+
+      // Update Firestore (UI/source of truth)
+      try {
+        await FirebaseFirestore.instance.collection('incubators').doc(selectedIncubator).update({
+          firestoreKey: value,
+        });
+      } catch (e) {
+        debugPrint('Firestore update failed for $firestoreKey: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to update $firestoreKey in Firestore')),
+        );
+        }
+      }
+
+      // Write to Realtime Database for Arduino (1/0)
+      try {
+        final sensorId = incubatorData[selectedIncubator]?['sensorId'] as String?;
+        if (sensorId != null && sensorId.isNotEmpty) {
+          final dbRef = FirebaseDatabase.instance.ref('HatchTech/$sensorId/$realtimeKey');
+          await dbRef.set(value ? 1 : 0);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('$realtimeKey command sent')),
+          );
+          }
+        } else {
+          debugPrint('No sensorId for $selectedIncubator — skipped Realtime DB write for $realtimeKey.');
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('No device connected for $selectedIncubator')),
+          );
+          }
+        }
+      } catch (e) {
+        debugPrint('Realtime DB write failed for $realtimeKey: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send $realtimeKey command')),
+        );
+        }
+      }
+    } catch (e, st) {
+      debugPrint('Unexpected error toggling $firestoreKey: $e\n$st');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error toggling $firestoreKey')),
+      );
+      }
+    } finally {
+    // clear pending and rebuild UI so switch re-enables
+    if (mounted) {
+      setState(() {
+        _togglePending[key] = false;
+      });
+    } else {
+      _togglePending[key] = false;
+    }
+    }
+  }
+
+  Future<void> _addBatchToHistory(Map<String, dynamic> batchData, String incubatorName, {String reason = 'Completed'}) async {
     final historyEntry = Map<String, dynamic>.from(batchData);
     historyEntry['incubatorName'] = incubatorName;
     historyEntry['completedDate'] = DateTime.now().millisecondsSinceEpoch;
     historyEntry['completionReason'] = reason;
-    FirebaseFirestore.instance.collection('batchHistory').add(historyEntry);
+
+    try {
+      final collection = FirebaseFirestore.instance.collection('batchHistory');
+      // Avoid duplicate entries: check for existing entries with same batchName, startDate and incubatorName
+      final batchName = historyEntry['batchName'];
+      final startDate = historyEntry['startDate'];
+      if (batchName != null && startDate != null) {
+        final query = await collection
+            .where('batchName', isEqualTo: batchName)
+            .where('startDate', isEqualTo: startDate)
+            .where('incubatorName', isEqualTo: incubatorName)
+            .limit(1)
+            .get();
+        if (query.docs.isNotEmpty) {
+          // already recorded
+          return;
+        }
+      }
+
+      await collection.add(historyEntry);
+    } catch (e) {
+      // ignore or log
+      debugPrint('Error adding batch history: $e');
+    }
   }
 
   void addNewIncubator() {
@@ -752,22 +872,23 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                               buildSensorCard('Humidity', (selected['humidity'] as num?)?.toDouble() ?? 0.0, Icons.water_drop, max: 100),
                               buildSensorCard('Oxygen', (selected['oxygen'] as num?)?.toDouble() ?? 0.0, Icons.air, max: 25),
                               buildSensorCard('CO₂', (selected['co2'] as num?)?.toDouble() ?? 0.0, Icons.cloud, max: 1200),
-                              buildToggleCard('Egg Turning', selected['eggTurning'] ?? false, (val) {
-                                setState(() {
-                                  incubatorData[selectedIncubator]!['eggTurning'] = val;
-                                });
-                                FirebaseFirestore.instance.collection('incubators').doc(selectedIncubator).update({
-                                  'eggTurning': val,
-                                });
-                              }),
-                              buildToggleCard('Lighting', selected['lighting'] ?? false, (val) {
-                                setState(() {
-                                  incubatorData[selectedIncubator]!['lighting'] = val;
-                                });
-                                FirebaseFirestore.instance.collection('incubators').doc(selectedIncubator).update({
-                                  'lighting': val,
-                                });
-                              }),
+                              buildToggleCard(
+                                'Egg Turning',
+                                selected['eggTurning'] ?? false,
+                                (val) {
+                                  _toggleAndSend(firestoreKey: 'eggTurning', realtimeKey: 'motor', value: val);
+                                },
+                                enabled: _togglePending['${selectedIncubator}_eggTurning'] != true,
+                              ),
+
+                              buildToggleCard(
+                                'Lighting',
+                                selected['lighting'] ?? false,
+                                (val) {
+                                  _toggleAndSend(firestoreKey: 'lighting', realtimeKey: 'light', value: val);
+                                },
+                                enabled: _togglePending['${selectedIncubator}_lighting'] != true,
+                              ),
                             ],
                           ),
                           const SizedBox(height: 10),
@@ -881,7 +1002,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     );
   }
 
-  Widget buildToggleCard(String label, bool isOn, Function(bool) onChanged) {
+  Widget buildToggleCard(String label, bool isOn, Function(bool) onChanged, {bool enabled = true}) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     IconData icon = label == 'Lighting' ? Icons.lightbulb : Icons.sync;
     Color iconColor = isOn 
@@ -921,14 +1042,28 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
             },
           ),
           const SizedBox(height: 10),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 200),
-            child: Switch(
-              key: ValueKey(isOn),
-              value: isOn,
-              onChanged: onChanged,
-              activeColor: isDarkMode ? const Color(0xFF40C057) : Colors.green,
-            ),
+          Stack(
+            alignment: Alignment.center,
+            children: [
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: Opacity(
+                  opacity: enabled ? 1.0 : 0.5,
+                  child: Switch(
+                    key: ValueKey(isOn),
+                    value: isOn,
+                    onChanged: enabled ? onChanged : null,
+                    activeColor: isDarkMode ? const Color(0xFF40C057) : Colors.green,
+                  ),
+                ),
+              ),
+              if (!enabled)
+                const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
           ),
           AnimatedDefaultTextStyle(
             duration: const Duration(milliseconds: 300),
@@ -1469,7 +1604,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
             onPressed: () {
               _addBatchToHistory(currentBatch, selectedIncubator, reason: 'Replaced');
               Navigator.pop(context);
-              showNewBatchFormDialog(context);
+              // mark prevArchived=true to avoid duplicate history insertion inside the form
+              showNewBatchFormDialog(context, prevArchived: true);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.orange,
@@ -1482,7 +1618,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     );
   }
 
-  void showNewBatchFormDialog(BuildContext context) {
+  void showNewBatchFormDialog(BuildContext context, {bool prevArchived = false}) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final TextEditingController batchController = TextEditingController();
     final TextEditingController eggCountController = TextEditingController(text: '12');
@@ -1571,13 +1707,9 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
               
               if (batchName.isNotEmpty && eggCount > 0) {
                 final prevBatch = incubatorData[selectedIncubator];
-                if (prevBatch != null && prevBatch['batchName'] != null && prevBatch['batchName'].toString().isNotEmpty) {
-                  final now = DateTime.now();
-                  final historyEntry = Map<String, dynamic>.from(prevBatch);
-                  historyEntry['incubatorName'] = selectedIncubator;
-                  historyEntry['completedDate'] = now.millisecondsSinceEpoch;
-                  historyEntry['completionReason'] = 'Replaced';
-                  await FirebaseFirestore.instance.collection('batchHistory').add(historyEntry);
+                if (!prevArchived && prevBatch != null && prevBatch['batchName'] != null && prevBatch['batchName'].toString().isNotEmpty) {
+                  // only archive previous batch here if it wasn't already archived by the caller
+                  _addBatchToHistory(prevBatch, selectedIncubator, reason: 'Replaced');
                 }
                 final updateData = <String, dynamic>{
                   'batchName': batchName,

@@ -3,6 +3,8 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <!-- For Android 13+ -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <!-- Needed for Android 13+ runtime notification permission requests -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
         android:label="hatchtech"
         android:name="${applicationName}"

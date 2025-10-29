@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:async';
 import 'profile_screen.dart';
+import 'utils/analytics_helper.dart';
 
 class AnalyticsScreen extends StatefulWidget {
   final String userName;
@@ -70,52 +71,15 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
   
   double _calculateOverallHatchRate() {
-    if (batchHistory.isEmpty) return 0.0;
-    double totalSuccessRate = 0.0;
-    int completedBatches = 0;
-    for (var batch in batchHistory) {
-      if (batch['hatchedCount'] != null && batch['eggCount'] != null) {
-        final double successRate = (batch['hatchedCount'] / batch['eggCount']) * 100;
-        totalSuccessRate += successRate;
-        completedBatches++;
-      }
-    }
-    return completedBatches > 0 ? totalSuccessRate / completedBatches : 0.0;
+    return calculateOverallHatchRate(batchHistory);
   }
 
   int _getTotalCompletedBatches() {
-    return batchHistory.length;
+    return getTotalCompletedBatches(batchHistory);
   }
 
   String _getNextCandlingDate() {
-    DateTime? nextCandling;
-    incubatorData.forEach((name, data) {
-      final int startDateMs = data['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
-      final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
-      final List<int> candlingDays = [7, 14, 18];
-      final DateTime now = DateTime.now();
-      final int daysElapsed = now.difference(startDate).inDays;
-      final Map<String, dynamic> candlingDates = data['candlingDates'] ?? {};
-      for (int day in candlingDays) {
-        final bool candlingDone = candlingDates['$day'] == true;
-        if (daysElapsed < day && !candlingDone) {
-          final DateTime candlingDate = startDate.add(Duration(days: day));
-          if (nextCandling == null || candlingDate.isBefore(nextCandling!)) {
-            nextCandling = candlingDate;
-          }
-          break;
-        } else if (daysElapsed >= day && !candlingDone) {
-          final DateTime candlingDate = startDate.add(Duration(days: day));
-          if (nextCandling == null || candlingDate.isBefore(nextCandling!)) {
-            nextCandling = candlingDate;
-          }
-        }
-      }
-    });
-    if (nextCandling != null) {
-      return '${nextCandling!.day}/${nextCandling!.month}/${nextCandling!.year}';
-    }
-    return 'No active batches';
+    return getNextCandlingDate(incubatorData, batchHistory);
   }
 
   void _navigateToDashboard(String incubatorName) {
