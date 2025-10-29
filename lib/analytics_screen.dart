@@ -403,6 +403,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         final int daysElapsed = now.difference(startDate).inDays;
         final int daysRemaining = (incubationDays - daysElapsed).clamp(0, incubationDays);
 
+        final bool isActiveBatch = data['isActiveBatch'] == true;
+
         return Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           child: Container(
@@ -412,9 +414,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Header
                 Row(
                   children: [
-                    Icon(Icons.egg, color: Colors.blue, size: 28),
+                    const Icon(Icons.egg, color: Colors.blue, size: 28),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(
@@ -442,7 +445,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // Progress Section
+               // Incubation Progress Section
                 _buildDetailSection(
                   'Incubation Progress',
                   Icons.schedule,
@@ -450,13 +453,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   [
                     'Started: ${startDate.day}/${startDate.month}/${startDate.year}',
                     'Day $daysElapsed of $incubationDays',
-                    daysRemaining == 0 ? 'Ready to hatch!' :
-                    daysRemaining == 1 ? '1 day left' : '$daysRemaining days remaining',
+                    daysRemaining == 0
+                        ? 'Ready to hatch!'
+                        : daysRemaining == 1
+                          ? '1 day left'
+                          : '$daysRemaining days remaining',
                   ],
                 ),
 
                 const SizedBox(height: 16),
 
+                // Environmental Conditions Section
                 _buildDetailSection(
                   'Environmental Conditions',
                   Icons.thermostat,
@@ -469,19 +476,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   ],
                 ),
 
-                const SizedBox(height: 16),
+                // Equipment Status — show only if active
+                if (isActiveBatch) ...[
+                  const SizedBox(height: 16),
+                  _buildDetailSection(
+                    'Equipment Status',
+                    Icons.settings,
+                    Colors.blue,
+                    [
+                      'Egg Turning: ${eggTurning ? 'Active' : 'Inactive'}',
+                      'Lighting: ${lighting ? 'On' : 'Off'}',
+                    ],
+                  ),
+                ],
 
-                _buildDetailSection(
-                  'Equipment Status',
-                  Icons.settings,
-                  Colors.blue,
-                  [
-                    'Egg Turning: ${eggTurning ? 'Active' : 'Inactive'}',
-                    'Lighting: ${lighting ? 'On' : 'Off'}',
-                  ],
-                ),
-
-                if (data['isActiveBatch'] == true) ...[
+                // View Details Button — show only if active
+                if (isActiveBatch) ...[
                   const SizedBox(height: 24),
                   SizedBox(
                     width: double.infinity,
@@ -627,7 +637,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${_calculateOverallHatchRate()}%',
+                          '${_calculateOverallHatchRate().toStringAsFixed(2)}%',
                           style: const TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.bold,
@@ -709,12 +719,24 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             
             const SizedBox(height: 24),
             
-            Text(
-              'Recent Batch History',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
+            Row(
+              children: [
+                Text(
+                  'Batch History',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
                   ?.copyWith(fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                Text(
+                  'Tap for details',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 16),
             

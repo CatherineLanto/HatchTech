@@ -56,8 +56,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         final sub = dbRef.onValue.listen((event) async {
           final sensorData = event.snapshot.value as Map?;
           if (sensorData != null) {
-            // Normalize values: prefer Arduino keys ('motor'/'light') but fall back to Firestore keys ('eggTurning'/'lighting').
-            // This allows existing devices that send motor/light (0/1) to work and keeps Firestore fields boolean.
+            // Normalize values: prefer Arduino keys ('motor'/'light'/'fan') but fall back to Firestore keys ('eggTurning'/'lighting').
+            // This allows existing devices that send motor/light/fan (0/1) to work and keeps Firestore fields boolean.
             dynamic rawEgg = sensorData['motor'] ?? sensorData['eggTurning'];
             bool eggTurning = false;
             if (rawEgg is bool) {
@@ -69,6 +69,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
             }
 
             dynamic rawLight = sensorData['light'] ?? sensorData['lighting'];
+            // optional fan key coming from manual incubator controls
+            dynamic rawFan = sensorData['fan'] ?? sensorData['fanOn'] ?? sensorData['fan_state'];
             bool lighting = false;
             if (rawLight is bool) {
               lighting = rawLight;
@@ -76,6 +78,20 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
               lighting = rawLight != 0;
             } else if (rawLight is String) {
               lighting = rawLight == '1' || rawLight.toLowerCase() == 'true';
+            }
+
+            // Update local UI state immediately so manual control changes show up without waiting for Firestore round-trip.
+            if (mounted) {
+              setState(() {
+                incubatorData[incubatorId] ??= {};
+                incubatorData[incubatorId]!['temperature'] = sensorData['temperature'] ?? 0.0;
+                incubatorData[incubatorId]!['humidity'] = sensorData['humidity'] ?? 0.0;
+                incubatorData[incubatorId]!['oxygen'] = sensorData['oxygen'] ?? 0.0;
+                incubatorData[incubatorId]!['co2'] = sensorData['co2'] ?? 0.0;
+                incubatorData[incubatorId]!['eggTurning'] = eggTurning;
+                incubatorData[incubatorId]!['lighting'] = lighting;
+                incubatorData[incubatorId]!['fan'] = (rawFan is num) ? (rawFan != 0) : (rawFan is bool ? rawFan : (rawFan is String ? (rawFan == '1' || rawFan.toLowerCase() == 'true') : false));
+              });
             }
 
             // Update Firestore incubator document with new sensor data using normalized booleans.
@@ -86,6 +102,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
               'co2': sensorData['co2'] ?? 0.0,
               'eggTurning': eggTurning,
               'lighting': lighting,
+              'fan': (rawFan is num) ? (rawFan != 0) : (rawFan is bool ? rawFan : (rawFan is String ? (rawFan == '1' || rawFan.toLowerCase() == 'true') : false)),
             });
           }
         });

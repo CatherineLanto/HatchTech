@@ -15,9 +15,14 @@ final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  // You can handle background messages here (e.g., log, analytics)
+
+  // Initialize notification service to show a notification
+  await FcmLocalNotificationService.instance.init();
+  await FcmLocalNotificationService.instance.showNotificationFromRemoteMessage(message);
+
   print('Handling a background message: ${message.messageId}');
 }
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
