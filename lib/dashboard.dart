@@ -136,6 +136,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       }
     });
   }
+
   void showAddIncubatorDialog(BuildContext context) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
@@ -895,6 +896,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                                 (val) {
                                   _toggleAndSend(firestoreKey: 'eggTurning', realtimeKey: 'motor', value: val);
                                 },
+                                selectedIncubator,
                                 enabled: _togglePending['${selectedIncubator}_eggTurning'] != true,
                               ),
 
@@ -904,6 +906,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                                 (val) {
                                   _toggleAndSend(firestoreKey: 'lighting', realtimeKey: 'light', value: val);
                                 },
+                                selectedIncubator,
                                 enabled: _togglePending['${selectedIncubator}_lighting'] != true,
                               ),
                             ],
@@ -1020,12 +1023,104 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     );
   }
 
-  Widget buildToggleCard(String label, bool isOn, Function(bool) onChanged, {bool enabled = true}) {
+  Widget buildToggleCard(String label, bool isOn, Function(bool) onChanged, String selectedIncubator, {bool enabled = true}) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     IconData icon = label == 'Lighting' ? Icons.lightbulb : Icons.sync;
-    Color iconColor = isOn 
-        ? (isDarkMode ? const Color(0xFF40C057) : Colors.green) 
+    Color iconColor = isOn
+        ? (isDarkMode ? const Color(0xFF40C057) : Colors.green)
         : (isDarkMode ? const Color(0xFF6C757D) : Colors.grey);
+
+    final DatabaseReference dbRef =
+        FirebaseDatabase.instance.ref("HatchTech/$selectedIncubator");
+
+    // --- Function to show interval/duration settings ---
+    void showEggTurningSettings() async {
+      int currentInterval = 3;
+      int currentDuration = 15;
+
+      // Fetch current values from RTDB
+      final intervalSnap = await dbRef.child("turnIntervalHours").get();
+      final durationSnap = await dbRef.child("turnDurationSeconds").get();
+
+      if (intervalSnap.exists) currentInterval = int.tryParse(intervalSnap.value.toString()) ?? 3;
+      if (durationSnap.exists) currentDuration = int.tryParse(durationSnap.value.toString()) ?? 15;
+
+      final TextEditingController intervalController =
+          TextEditingController(text: currentInterval.toString());
+      final TextEditingController durationController =
+          TextEditingController(text: currentDuration.toString());
+
+      showDialog(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            backgroundColor: isDarkMode ? const Color(0xFF2C2C2C) : Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text("⚙️ Egg Turning Settings"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: intervalController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: "Turning Interval (hours)",
+                    hintText: "1–24",
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: durationController,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: "Motor Duration (seconds)",
+                    hintText: "5–30",
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancel"),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final int? newInterval = int.tryParse(intervalController.text);
+                  final int? newDuration = int.tryParse(durationController.text);
+
+                  if (newInterval != null &&
+                    newDuration != null &&
+                    newInterval > 0 &&
+                    newInterval <= 24 &&
+                    newDuration >= 5 &&
+                    newDuration <= 30) {
+                      await dbRef.child("turnIntervalHours").set(newInterval);
+                      await dbRef.child("turnDurationSeconds").set(newDuration);
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("✅ Egg Turning settings updated!"),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    Navigator.pop(context);
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("⚠️ Invalid values! Interval: 1–24 hrs, Duration: 5–30 sec."),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  }
+                },
+                child: const Text("Save"),
+              ),
+            ],
+          );
+        },
+      );
+    }
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 300),
@@ -1035,65 +1130,101 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-           color: isDarkMode ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
+            color: isDarkMode ? Colors.black26 : Colors.grey.withValues(alpha: 0.1),
             blurRadius: 4,
           ),
         ],
       ),
       padding: const EdgeInsets.all(12),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Stack(
         children: [
-          TweenAnimationBuilder<Color?>(
-            duration: const Duration(milliseconds: 400),
-            tween: ColorTween(begin: Colors.grey, end: iconColor),
-            builder: (context, color, child) {
-              if (label == 'Egg Turning') {
-                return AnimatedRotation(
-                  duration: const Duration(milliseconds: 300),
-                  turns: isOn ? 0.0 : 0.25,
-                  child: Icon(icon, size: 40, color: color),
-                );
-              } else {
-                return Icon(icon, size: 40, color: color);
-              }
-            },
-          ),
-          const SizedBox(height: 10),
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 200),
-                child: Opacity(
-                  opacity: enabled ? 1.0 : 0.5,
-                  child: Switch(
-                    key: ValueKey(isOn),
-                    value: isOn,
-                    onChanged: enabled ? onChanged : null,
-                    activeColor: isDarkMode ? const Color(0xFF40C057) : Colors.green,
+          // --- Top-right kebab menu (only for Egg Turning) ---
+          if (label == 'Egg Turning')
+            Positioned(
+              top: 0,
+              right: 0,
+              child: PopupMenuButton<String>(
+                icon: const Icon(Icons.more_vert, size: 20),
+                onSelected: (value) {
+                  if (value == 'settings') showEggTurningSettings();
+                },
+                itemBuilder: (BuildContext context) => [
+                  const PopupMenuItem<String>(
+                    value: 'settings',
+                    child: Text('Adjust Turning Settings'),
                   ),
-                ),
+                ],
               ),
-              if (!enabled)
-                const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-            ],
-          ),
-          AnimatedDefaultTextStyle(
-            duration: const Duration(milliseconds: 300),
-            style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: iconColor.withValues(alpha: 0.8),
             ),
-            child: Text(label),
+
+          // --- Main card content ---
+          Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // --- Icon and Kebab Menu ---
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  TweenAnimationBuilder<Color?>(
+                    duration: const Duration(milliseconds: 400),
+                    tween: ColorTween(begin: Colors.grey, end: iconColor),
+                    builder: (context, color, child) {
+                      if (label == 'Egg Turning') {
+                        return AnimatedRotation(
+                          duration: const Duration(milliseconds: 300),
+                          turns: isOn ? 0.0 : 0.25,
+                          child: Icon(icon, size: 40, color: color),
+                        );
+                      } else {
+                        return Icon(icon, size: 40, color: color);
+                      }
+                    },
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // --- Toggle Switch ---
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 200),
+                    child: Opacity(
+                      opacity: enabled ? 1.0 : 0.5,
+                      child: Switch(
+                        key: ValueKey(isOn),
+                        value: isOn,
+                        onChanged: enabled ? onChanged : null,
+                        activeColor:
+                          isDarkMode ? const Color(0xFF40C057) : Colors.green,
+                      ),
+                    ),
+                  ),
+                 if (!enabled)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ],
+              ),
+
+              // --- Label ---
+              AnimatedDefaultTextStyle(
+                duration: const Duration(milliseconds: 300),
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                    color: iconColor.withValues(alpha: 0.8),
+                ),
+                child: Text(label),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
+
 
   Widget buildBatchTrackingCard(Map<String, dynamic> data) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;

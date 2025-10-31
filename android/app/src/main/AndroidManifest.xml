@@ -6,7 +6,7 @@
     <!-- Needed for Android 13+ runtime notification permission requests -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="hatchtech"
+        android:label="HatchTech"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
