@@ -452,33 +452,33 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   Colors.orange,
                   [
                     'Started: ${startDate.day}/${startDate.month}/${startDate.year}',
-                    'Day $daysElapsed of $incubationDays',
                     daysRemaining == 0
-                        ? 'Ready to hatch!'
+                        ? 'Successfully hatched!'
                         : daysRemaining == 1
                           ? '1 day left'
                           : '$daysRemaining days remaining',
                   ],
                 ),
 
-                const SizedBox(height: 16),
-
-                // Environmental Conditions Section
-                _buildDetailSection(
-                  'Environmental Conditions',
-                  Icons.thermostat,
-                  Colors.green,
-                  [
-                    'Temperature: $temperature°C',
-                    'Humidity: $humidity%',
-                    'Oxygen: $oxygen%',
-                    'CO₂: $co2 ppm',
-                  ],
-                ),
+                // Environmental Conditions Section — show only if active
+                if (isActiveBatch) ...[
+                  const SizedBox(height: 20),
+                  _buildDetailSection(
+                    'Environmental Conditions',
+                    Icons.thermostat,
+                    Colors.green,
+                    [
+                      'Temperature: $temperature°C',
+                      'Humidity: $humidity%',
+                      'Oxygen: $oxygen%',
+                      'CO₂: $co2 ppm',
+                    ],
+                  ),
+                ],
 
                 // Equipment Status — show only if active
                 if (isActiveBatch) ...[
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
                   _buildDetailSection(
                     'Equipment Status',
                     Icons.settings,
@@ -912,7 +912,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
-                    daysRemaining == 0 ? 'Ready to hatch!' : 
+                    daysRemaining == 0 ? 'Successfully hatched!' :
                     daysRemaining == 1 ? '1 day left' : '$daysRemaining days left',
                     style: TextStyle(
                       fontSize: 11,

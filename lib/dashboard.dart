@@ -1030,8 +1030,11 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         ? (isDarkMode ? const Color(0xFF40C057) : Colors.green)
         : (isDarkMode ? const Color(0xFF6C757D) : Colors.grey);
 
-    final DatabaseReference dbRef =
-        FirebaseDatabase.instance.ref("HatchTech/$selectedIncubator");
+    final incubatorMap = {"Incubator 1": "Incubator1","Incubator 2": "Incubator2",};
+
+    final DatabaseReference dbRef = FirebaseDatabase.instance.ref(
+      "HatchTech/${incubatorMap[selectedIncubator] ?? selectedIncubator}",
+    );
 
     // --- Function to show interval/duration settings ---
     void showEggTurningSettings() async {
