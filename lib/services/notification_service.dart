@@ -1,6 +1,6 @@
 // A small wrapper around flutter_local_notifications to show notifications
 // for foreground messages and create channels on Android.
-// ignore_for_file: use_super_parameters
+// ignore_for_file: use_super_parameters, avoid_print
 
 import 'dart:async';
 import 'dart:io';
@@ -50,31 +50,104 @@ class FcmLocalNotificationService {
         ?.createNotificationChannel(channel);
   }
 
-  /// Show a local notification populated from a [RemoteMessage]
+  /// Show a local notification from a RemoteMessage, supporting data-only payloads
   Future<void> showNotificationFromRemoteMessage(RemoteMessage message) async {
-    final notification = message.notification;
+    // Extract data-only payload values
+    final data = message.data;
+    final title = data['title'] ?? 'HatchTech Alert';
+    final body = data['body'] ?? 'Check incubator status.';
+    final type = data['type'] ?? 'general';
 
-    if (notification == null) return;
+    // For testing: print payload
+    print('📩 Data-only message received: $data');
 
-    const androidDetails = AndroidNotificationDetails(
-      'hatchtech_default_channel',
-      'HatchTech Notifications',
-      channelDescription: 'Default channel for HatchTech notifications',
-      importance: Importance.high,
-      priority: Priority.high,
+    await showNotification(
+      title: title,
+      body: body,
+      type: type,
     );
+  }
+
+  Future<void> showNotification({
+    required String title,
+    required String body,
+    String? type,
+    BuildContext? context,
+  }) async {
+    // Define channel and base settings
+    AndroidNotificationDetails androidDetails;
+
+    if (type == 'sensor_alert') {
+      androidDetails = const AndroidNotificationDetails(
+        'hatchtech_sensor_channel',
+        'Sensor Alerts',
+        channelDescription: 'Alerts for abnormal sensor readings',
+        importance: Importance.high,
+        priority: Priority.high,
+        color: Colors.redAccent,
+        icon: '@mipmap/ic_launcher', // optional custom icon
+      );
+    } else if (type == 'maintenance_alert') {
+      androidDetails = const AndroidNotificationDetails(
+        'hatchtech_maintenance_channel',
+        'Maintenance Alerts',
+        channelDescription: 'Maintenance reminders or required actions',
+        importance: Importance.high,
+        priority: Priority.high,
+        color: Colors.orangeAccent,
+        icon: '@mipmap/ic_maintenance', // optional custom icon
+      );
+    } else if (type == 'predictive_alert') {
+      androidDetails = const AndroidNotificationDetails(
+        'hatchtech_predictive_channel',
+        'Predictive Maintenance',
+        channelDescription: 'Predicted issues before failure occurs',
+        importance: Importance.high,
+        priority: Priority.high,
+        color: Colors.blueAccent,
+        icon: '@mipmap/ic_predictive', // optional custom icon
+      );
+    } else {
+      androidDetails = const AndroidNotificationDetails(
+        'hatchtech_default_channel',
+        'HatchTech Notifications',
+        channelDescription: 'General notifications from HatchTech',
+        importance: Importance.high,
+        priority: Priority.high,
+        color: Colors.blueGrey,
+      );
+    }
 
     const iosDetails = DarwinNotificationDetails();
 
-    final platformDetails = NotificationDetails(android: androidDetails, iOS: iosDetails);
+    final notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
 
     await _flutterLocalNotificationsPlugin.show(
-      notification.hashCode,
-      notification.title,
-      notification.body,
-      platformDetails,
-      payload: message.data.isNotEmpty ? message.data.toString() : null,
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      title,
+      body,
+      notificationDetails,
     );
+
+    // Optional popup if the app is in foreground
+    if (type == 'sensor_alert' && context != null) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text("⚠️ $title"),
+          content: Text(body),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Dismiss'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 }
 

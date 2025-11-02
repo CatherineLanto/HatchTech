@@ -1,3 +1,6 @@
+// ignore_for_file: avoid_print
+
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'services/auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -5,6 +8,8 @@ import 'dart:async';
 import 'profile_screen.dart';
 import 'utils/analytics_helper.dart';
 import 'services/notification_service.dart';
+import 'maintenance_log.dart';
+
 
 class OverviewPage extends StatefulWidget {
   final String userName;
@@ -16,6 +21,7 @@ class OverviewPage extends StatefulWidget {
   final Function(String)? onNavigateToDashboard;
   final VoidCallback? onNavigateToAnalytics;
   final String? userRole;
+  final dynamic onNavigateToMaintenance;
 
   const OverviewPage({
     super.key,
@@ -28,6 +34,7 @@ class OverviewPage extends StatefulWidget {
     this.onNavigateToDashboard,
     this.onNavigateToAnalytics,
     this.userRole,
+    this.onNavigateToMaintenance,
   });
 
   @override
@@ -132,6 +139,9 @@ class _OverviewPageState extends State<OverviewPage> {
   Map<String, Map<String, dynamic>> get _currentIncubatorData {
     return widget.sharedIncubatorData ?? incubatorData;
   }
+  
+  get selectedIncubator => null;
+  get currentUserName => null;
 
   Future<void> _loadFirebaseUserData() async {
     try {
@@ -582,6 +592,88 @@ class _OverviewPageState extends State<OverviewPage> {
                 )),
           ],
 
+          // --- Maintenance Section ---
+          const SizedBox(height: 20),
+GestureDetector(
+  onTap: () {
+    widget.onNavigateToMaintenance?.call();
+  },
+  child: Card(
+    elevation: 2,
+    color: isDarkMode ? const Color(0xFF0F1B2D) : const Color(0xFFE3F2FD),
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    child: Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.build_circle_rounded, color: Colors.blueAccent, size: 28),
+              SizedBox(width: 10),
+              Text(
+                "Maintenance",
+                style: TextStyle(
+                  fontSize: 18,
+                  color: Colors.blueAccent,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          FutureBuilder<Map<String, dynamic>>(
+            future: FirebaseDatabase.instance
+                .ref("HatchTech/Maintenance")
+                .get()
+                .then((snapshot) => (snapshot.value ?? {}) as Map<String, dynamic>),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                return const Text(
+                  "No recent maintenance records found.",
+                  style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
+                );
+              }
+
+              final maintenanceRecords = snapshot.data!;
+              final entries = maintenanceRecords.entries.toList()
+                ..sort((a, b) => b.value['timestamp'].compareTo(a.value['timestamp']));
+
+              final latestRecords = entries.take(3).toList();
+
+              return Column(
+                children: latestRecords.map((entry) {
+                  final data = entry.value;
+                  final date = DateTime.fromMillisecondsSinceEpoch(data['timestamp']);
+                  final formattedDate =
+                      "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+
+                  return Card(
+                    color: isDarkMode ? const Color(0xFF0F1B2D) : Colors.blue.shade50,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    child: ListTile(
+                      leading: const Icon(Icons.settings, color: Colors.blueAccent),
+                      title: Text(
+                        data['task'] ?? 'Maintenance Task',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: Text("Date: $formattedDate\nBy: ${data['performedBy'] ?? 'N/A'}"),
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    ),
+  ),
+),
+
+
           if (normalIncubators.isEmpty && warningIncubators.isEmpty) ...[
             const SizedBox(height: 20),
             Card(
@@ -783,4 +875,51 @@ class _OverviewPageState extends State<OverviewPage> {
       ],
     );
   }
+
+  Widget buildMaintenanceSection() {
+    return StreamBuilder(
+      stream: FirebaseDatabase.instance
+          .ref("HatchTech/$selectedIncubator/maintenance/active")
+          .onValue,
+      builder: (context, snapshot) {
+        final rawValue = snapshot.data!.snapshot.value;
+        if (rawValue is Map) {
+          final Map<String, dynamic> data = Map<String, dynamic>.from(rawValue);
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text("⚙️ Predictive Maintenance Alerts",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                const SizedBox(height: 8),
+                ...data.entries.map((entry) => Card(
+                margin: const EdgeInsets.symmetric(vertical: 4),
+                  child: ListTile(
+                    leading: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                    title: Text(entry.key.toUpperCase()),
+                    subtitle: Text(entry.value.toString()),
+                  ),
+                )),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton( 
+                    onPressed: () { 
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => MaintenanceLogPage(incubatorId: selectedIncubator, userName: currentUserName, themeNotifier: widget.themeNotifier,),
+                        ),
+                      );
+                    },
+                    child: const Text("View All →"),
+                  ),
+                ),
+             ],
+            );
+          } else {
+            return const Text("No current maintenance alerts ✅");
+          }
+          },
+    );
+  }
+
 }

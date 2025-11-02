@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'overview_screen.dart';
 import 'dashboard.dart';
 import 'analytics_screen.dart';
+import 'maintenance_log.dart';
 
 class MainNavigation extends StatefulWidget {
   final String userName;
@@ -132,6 +133,11 @@ class _MainNavigationState extends State<MainNavigation> {
             onNavigateToDashboard: _navigateToDashboard,
             onNavigateToAnalytics: _navigateToAnalytics,
             userRole: userRole,
+            onNavigateToMaintenance: () {
+              setState(() {
+                _currentIndex = 3; 
+              });
+            },
           ),
           Dashboard(
             key: ValueKey('dashboard_${currentUserName}_$selectedIncubatorName'),
@@ -158,8 +164,10 @@ class _MainNavigationState extends State<MainNavigation> {
             onBatchHistoryChanged: _refreshBatchHistory,
             userRole: userRole,
           ),
+          MaintenanceLogPage(incubatorId: 'selectedIncubatorName', themeNotifier: widget.themeNotifier, userName: currentUserName,),
         ],
       ),
+
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
@@ -186,6 +194,11 @@ class _MainNavigationState extends State<MainNavigation> {
             icon: Icon(Icons.analytics_outlined),
             activeIcon: Icon(Icons.analytics),
             label: 'Analytics',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.build_outlined),
+            activeIcon: Icon(Icons.build),
+            label: 'Maintenance',
           ),
         ],
       ),

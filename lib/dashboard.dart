@@ -372,8 +372,9 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       parent: _warningAnimationController,
       curve: Curves.elasticOut,
     );
-  selectedIncubator = widget.incubatorName;
-  listenToIncubatorData();
+    selectedIncubator = widget.incubatorName;
+    listenToIncubatorData();
+    listenToMaintenance();
   }
 
   void checkAlerts() {
@@ -383,7 +384,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     List<Map<String, dynamic>> alerts = [];
 
     incubatorData.forEach((key, values) {
-      if (key == selectedIncubator) return; 
       
       if (values['temperature'] < 36 || values['temperature'] > 39) {
         alerts.add({
@@ -2682,4 +2682,28 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       widget.onScheduleChanged!(updatedSchedules);
     }
   }
+
+  void listenToMaintenance() {
+    FirebaseDatabase.instance.ref("HatchTech/$selectedIncubator/maintenance").onValue.listen((event) {
+      if (event.snapshot.value != null) {
+        Map data = Map<String, dynamic>.from(event.snapshot.value as Map);
+        data.forEach((key, message) {
+          showDialog(
+            context: context,
+            builder: (_) => AlertDialog(
+              title: Text("Predictive Maintenance Alert"),
+              content: Text(message.toString()),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("OK"),
+                ),
+              ],
+            ),
+          );
+        });
+      }
+    });
+  }
+
 }

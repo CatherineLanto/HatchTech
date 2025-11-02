@@ -19,7 +19,6 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   // Initialize notification service to show a notification
   await FcmLocalNotificationService.instance.init();
   await FcmLocalNotificationService.instance.showNotificationFromRemoteMessage(message);
-
   print('Handling a background message: ${message.messageId}');
 }
 
@@ -84,11 +83,19 @@ class _HatchTechAppState extends State<HatchTechApp> {
 
     // Foreground messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      // Show a local notification when a message arrives in foreground
-      FcmLocalNotificationService.instance.showNotificationFromRemoteMessage(message).catchError((err) {
-        print('Show notification error: $err');
-      });
-    });
+    print('📩 Foreground FCM received: ${message.data}');
+
+    final data = message.data;
+    final type = data['type'] ?? 'general';
+    final title = data['title'] ?? message.notification?.title ?? 'HatchTech Alert';
+    final body = data['body'] ?? message.notification?.body ?? 'Check incubator status.';
+
+    FcmLocalNotificationService.instance.showNotification(
+      title: title,
+      body: body,
+      type: type,
+    );
+  });
 
     // When the app is opened from a terminated state via a notification
     FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {

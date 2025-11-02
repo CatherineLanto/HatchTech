@@ -1,47 +1,79 @@
-import { firestore } from "firebase-functions";
-import { initializeApp, firestore as _firestore, messaging } from "firebase-admin";
-initializeApp();
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+admin.initializeApp();
 
-export const notifyIncubatorEvent = firestore
-    .document("incubators/{incubatorId}")
-    .onUpdate(async (change) => {
-      const newData = change.after.data();
+// =============== SENSOR ALERTS ===============
+exports.sensorAlert = functions.database
+  .ref("/incubators/{incubatorId}/sensors/{sensorType}")
+  .onUpdate(async (change, context) => {
+    const sensorValue = change.after.val();
+    const sensorType = context.params.sensorType;
+    const incubatorId = context.params.incubatorId;
 
-      // Example: Check for hatching/candling event
-      const startDate = newData.startDate;
-      const incubationDays = newData.incubationDays || 21;
-      const now = Date.now();
-      const daysElapsed = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
-      const daysRemaining = incubationDays - daysElapsed;
+    let alertTitle = "";
+    let alertBody = "";
 
-      let message = null;
-        if (daysRemaining <= 2 && daysRemaining > 0) {
-          message = `${newData.batchName || "Batch"}: Only ${daysRemaining} day(s) left until hatching!`;
-        }
+    if (sensorType === "temperature" && sensorValue > 39.5) {
+      alertTitle = "🔥 High Temperature Alert";
+      alertBody = `Incubator ${incubatorId} temperature is ${sensorValue}°C! Cooling activated.`;
+    } else if (sensorType === "humidity" && sensorValue < 40) {
+      alertTitle = "💧 Low Humidity Alert";
+      alertBody = `Incubator ${incubatorId} humidity dropped to ${sensorValue}%. Humidifier on.`;
+    } else if (sensorType === "gas" && sensorValue > 200) {
+      alertTitle = "☣️ Air Quality Alert";
+      alertBody = `Incubator ${incubatorId} detected high gas level: ${sensorValue}ppm.`;
+    }
 
-        // Example: Check for warning
-        if (
-          newData.humidity < 35 || newData.humidity > 65 ||
-          newData.temperature < 36 || newData.temperature > 39 ||
-          newData.oxygen < 19 || newData.co2 > 900
-        ) {
-          message = `${newData.batchName || "Batch"}: Warning! Incubator needs attention.`;
-        }
+    if (alertTitle !== "") {
+      const tokensSnapshot = await admin.firestore().collection("users").get();
+      const tokens = tokensSnapshot.docs.map(doc => doc.data().fcmToken);
 
-      if (message) {
-          // Get user FCM token (assumes incubator has a userId field)
-          const userId = newData.userId;
-          const userDoc = await _firestore().collection("users").doc(userId).get();
-          const fcmToken = userDoc.data().fcmToken;
-          if (fcmToken) {
-              await messaging().send({
-                  token: fcmToken,
-                  notification: {
-                      title: "Incubator Alert",
-                      body: message,
-                    },
-                });
-            }
-        }
-      return null;
-    });
+      const payload = {
+        data: {
+          title: alertTitle,
+          body: alertBody,
+          type: "sensor_alert",
+          incubatorId: incubatorId,
+        },
+      };
+
+      await admin.messaging().sendToDevice(tokens, payload);
+      console.log(`✅ Sent ${sensorType} alert for incubator ${incubatorId}`);
+    }
+  });
+  
+// =============== MAINTENANCE ALERTS ===============
+exports.maintenanceAlert = functions.database
+  .ref("/incubators/{incubatorId}/maintenance/status")
+  .onUpdate(async (change, context) => {
+    const newStatus = change.after.val();
+    const incubatorId = context.params.incubatorId;
+
+    let alertTitle = "";
+    let alertBody = "";
+
+    if (newStatus === "due") {
+      alertTitle = "🧰 Maintenance Due";
+      alertBody = `Incubator ${incubatorId} requires scheduled maintenance.`;
+    } else if (newStatus === "fault") {
+      alertTitle = "⚠️ Equipment Fault Detected";
+      alertBody = `A possible malfunction was detected in Incubator ${incubatorId}.`;
+    }
+
+    if (alertTitle !== "") {
+      const tokensSnapshot = await admin.firestore().collection("users").get();
+      const tokens = tokensSnapshot.docs.map(doc => doc.data().fcmToken);
+
+      const payload = {
+        data: {
+          title: alertTitle,
+          body: alertBody,
+          type: "maintenance_alert",
+          incubatorId: incubatorId,
+        },
+      };
+
+      await admin.messaging().sendToDevice(tokens, payload);
+      console.log(`✅ Sent maintenance alert for incubator ${incubatorId}`);
+    }
+  });
