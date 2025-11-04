@@ -67,7 +67,7 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          "Overview",
+          "Maintenance",
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.blueAccent,
