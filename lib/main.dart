@@ -3,14 +3,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_database/firebase_database.dart';
+
 import 'firebase_options.dart';
 import 'auth_wrapper.dart';
 import 'services/auth_service.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/notification_service.dart';
-import 'package:firebase_database/firebase_database.dart';
+import 'services/realtime_notification_service.dart'; // ✅ your new file
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
@@ -18,56 +20,43 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterL
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // Initialize notification service to show a notification
   await FcmLocalNotificationService.instance.init();
   await FcmLocalNotificationService.instance.showNotificationFromRemoteMessage(message);
   print('Handling a background message: ${message.messageId}');
 }
 
-
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-  const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+  // Initialize local notifications
+  const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const initSettings = InitializationSettings(android: androidInit);
+  await flutterLocalNotificationsPlugin.initialize(initSettings);
 
-  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
-
-  // Set up background message handler
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-
-  // NOTE: initialize the local notification plugin from the app isolate
-  // (we do this in the app widget's initState below) to avoid MissingPlugin
-  // exceptions that can happen if plugins aren't registered yet.
-
-  // Request notification permissions (iOS, Android 13+)
+  // Request notification permissions
   await FirebaseMessaging.instance.requestPermission(
     alert: true,
     badge: true,
     sound: true,
   );
 
-  // Get the device token for sending targeted notifications
-  final fcmToken = await FirebaseMessaging.instance.getToken();
-  print('FCM Token: $fcmToken');
+  // Handle FCM background messages
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // Save FCM token to Firestore for current user (if signed in)
-  // This requires AuthService.currentUser and FirebaseFirestore
+  // Retrieve FCM token
+  final fcmToken = await FirebaseMessaging.instance.getToken();
+  print('📱 FCM Token: $fcmToken');
+
+  // Save token to Firestore + RTDB
   try {
     final user = AuthService.currentUser;
     if (user != null && fcmToken != null) {
       await FirebaseFirestore.instance.collection('users').doc(user.uid).update({'fcmToken': fcmToken});
-
-      // ALSO save to Realtime Database where your functions expect tokens
-      final dbRef = FirebaseDatabase.instance.ref('fcmTokens/${user.uid}');
-      await dbRef.set(fcmToken);
+      await FirebaseDatabase.instance.ref('fcmTokens/${user.uid}').set(fcmToken);
     }
   } catch (e) {
-    print('Error saving FCM token: $e');
+    print('⚠️ Error saving FCM token: $e');
   }
 
   runApp(const HatchTechApp());
@@ -84,114 +73,39 @@ class _HatchTechAppState extends State<HatchTechApp> {
   @override
   void initState() {
     super.initState();
-    startRealtimeListener();
-    
 
-    // Initialize local notifications and set up message listeners here.
-    // Wrap initialize in try/catch so a MissingPluginException doesn't crash the app.
-    FcmLocalNotificationService.instance.init().catchError((err) {
-      // MissingPluginException often means the app was hot-reloaded without a
-      // full restart. Recommend full restart if this occurs.
-      print('Local notification init error: $err');
-    });
+    // ✅ Initialize local notifications
+    FcmLocalNotificationService.instance.init();
 
-    // Foreground messages
+    // ✅ Start real-time listener
+    RealtimeNotificationService.instance.init();
+    RealtimeNotificationService.instance.startListening();
+
+
+    // ✅ Handle foreground messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-    print('📩 Foreground FCM received: ${message.data}');
+      print('📩 Foreground FCM received: ${message.data}');
+      final data = message.data;
+      final title = data['title'] ?? message.notification?.title ?? 'HatchTech Alert';
+      final body = data['body'] ?? message.notification?.body ?? 'Check incubator status.';
 
-    final data = message.data;
-    final type = data['type'] ?? 'general';
-    final title = data['title'] ?? message.notification?.title ?? 'HatchTech Alert';
-    final body = data['body'] ?? message.notification?.body ?? 'Check incubator status.';
-
-    FcmLocalNotificationService.instance.showNotification(
-      title: title,
-      body: body,
-      type: type,
-    );
-  });
-
-    // When the app is opened from a terminated state via a notification
-    FirebaseMessaging.instance.getInitialMessage().then((RemoteMessage? message) {
-      if (message != null) {
-        // handle navigation based on message.data if needed
-        print('App opened from terminated state by notification: ${message.messageId}');
-      }
+      FcmLocalNotificationService.instance.showNotification(
+        title: title,
+        body: body,
+        type: data['type'] ?? 'general',
+      );
     });
 
-    // When app is in background and opened by tapping notification
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('Notification caused app to open: ${message.messageId}');
-      // handle navigation
+    // ✅ Handle app opened from terminated state
+    FirebaseMessaging.instance.getInitialMessage().then((message) {
+      if (message != null) print('🚀 App opened from terminated state by notification');
+    });
+
+    // ✅ Handle background tap
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      print('📬 Notification caused app to open');
     });
   }
-
-  Future<void> showLocalNotification(String title, String message) async {
-  const AndroidNotificationDetails androidPlatformChannelSpecifics =
-      AndroidNotificationDetails(
-    'hatchtech_channel',
-    'HatchTech Alerts',
-    importance: Importance.high,
-    priority: Priority.high,
-    showWhen: true,
-  );
-
-  const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
-
-  await flutterLocalNotificationsPlugin.show(
-    0,
-    title,
-    message,
-    platformChannelSpecifics,
-  );
-}
-
-final Map<String, Map<String, bool>> previousAlerts = {};
-
-void startRealtimeListener() {
-  final ref = FirebaseDatabase.instance.ref('HatchTech');
-
-  ref.onValue.listen((DatabaseEvent event) {
-    final data = event.snapshot.value as Map?;
-    if (data == null) return;
-
-    data.forEach((key, value) {
-      final incubator = value as Map?;
-      if (incubator == null) return;
-
-      // Initialize previous alert map if not exist
-      previousAlerts.putIfAbsent(key, () => {'tempHigh': false, 'humidityLow': false, 'gasHigh': false});
-
-      double temp = double.tryParse(incubator['temperature']?.toString() ?? '0') ?? 0;
-      double humidity = double.tryParse(incubator['humidity']?.toString() ?? '0') ?? 0;
-
-      bool tempHigh = temp > 39;
-      bool humidityLow = humidity < 35;
-
-      // 🔥 Temperature Alert
-      if (tempHigh && !previousAlerts[key]!['tempHigh']!) {
-        showLocalNotification('🔥 Temperature Alert',
-            '$key temperature is too high: ${temp.toStringAsFixed(1)}°C');
-        previousAlerts[key]!['tempHigh'] = true;
-      } else if (!tempHigh && previousAlerts[key]!['tempHigh']!) {
-        showLocalNotification('✅ Temperature Normal',
-            '$key temperature is back to normal at ${temp.toStringAsFixed(1)}°C.');
-        previousAlerts[key]!['tempHigh'] = false;
-      }
-
-      // 💧 Humidity Alert
-      if (humidityLow && !previousAlerts[key]!['humidityLow']!) {
-        showLocalNotification('💧 Low Humidity Alert',
-            '$key humidity dropped to ${humidity.toStringAsFixed(1)}%.');
-        previousAlerts[key]!['humidityLow'] = true;
-      } else if (!humidityLow && previousAlerts[key]!['humidityLow']!) {
-        showLocalNotification('✅ Humidity Normal',
-            '$key humidity is back to normal at ${humidity.toStringAsFixed(1)}%.');
-        previousAlerts[key]!['humidityLow'] = false;
-      }
-    });
-  });
-}
 
   @override
   Widget build(BuildContext context) {

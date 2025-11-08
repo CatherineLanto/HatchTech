@@ -474,7 +474,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
 
   Future<void> _toggleAndSend({required String firestoreKey, required String realtimeKey, required bool value}) async {
     final key = '${selectedIncubator}_$firestoreKey';
-    if (_togglePending[key] == true) return; // already working
+    if (_togglePending[key] == true) return; 
     _togglePending[key] = true;
 
     try {
@@ -563,7 +563,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
             .limit(1)
             .get();
         if (query.docs.isNotEmpty) {
-          // already recorded
           return;
         }
       }
@@ -955,8 +954,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     double percentage = value / max;
     Color barColor = 
-            (label == 'Humidity' && (value < 45 || value > 70)) ||
-            (label == 'Temperature' && (value < 37.0 || value > 38.0)) ||
+            (label == 'Humidity' && (value < 35 || value > 70)) ||
+            (label == 'Temperature' && (value < 36.5 || value > 39.0)) ||
             (label == 'Oxygen' && value < 18.5) ||
             (label == 'CO₂' && value > 5000)
         ? (isDarkMode ? const Color(0xFFFF5252) : Colors.red)
@@ -1860,7 +1859,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
               if (batchName.isNotEmpty && eggCount > 0) {
                 final prevBatch = incubatorData[selectedIncubator];
                 if (!prevArchived && prevBatch != null && prevBatch['batchName'] != null && prevBatch['batchName'].toString().isNotEmpty) {
-                  // only archive previous batch here if it wasn't already archived by the caller
                   _addBatchToHistory(prevBatch, selectedIncubator, reason: 'Replaced');
                 }
                 final updateData = <String, dynamic>{

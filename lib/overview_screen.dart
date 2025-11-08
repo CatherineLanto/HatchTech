@@ -221,7 +221,7 @@ class _OverviewPageState extends State<OverviewPage> {
       if (values['temperature'] < 36.5 || values['temperature'] > 39) {
         issues.add("Temperature out of range");
       }
-      if (values['oxygen'] < 19) {
+      if (values['oxygen'] < 18.5) {
         issues.add("Low oxygen level");
       }
       if (values['co2'] > 900) { 
