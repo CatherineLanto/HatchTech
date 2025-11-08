@@ -215,10 +215,10 @@ class _OverviewPageState extends State<OverviewPage> {
     _currentIncubatorData.forEach((name, values) {
       List<String> issues = [];
 
-      if (values['humidity'] < 35 || values['humidity'] > 65) {
+      if (values['humidity'] < 35 || values['humidity'] > 70) {
         issues.add("Humidity out of range");
       }
-      if (values['temperature'] < 36 || values['temperature'] > 39) {
+      if (values['temperature'] < 36.5 || values['temperature'] > 39) {
         issues.add("Temperature out of range");
       }
       if (values['oxygen'] < 19) {

@@ -3,14 +3,17 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'firebase_options.dart';
 import 'auth_wrapper.dart';
 import 'services/auth_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'services/notification_service.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -28,6 +31,11 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  const AndroidInitializationSettings initializationSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
+  const InitializationSettings initializationSettings = InitializationSettings(android: initializationSettingsAndroid);
+
+  await flutterLocalNotificationsPlugin.initialize(initializationSettings);
 
   // Set up background message handler
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -53,6 +61,10 @@ void main() async {
     final user = AuthService.currentUser;
     if (user != null && fcmToken != null) {
       await FirebaseFirestore.instance.collection('users').doc(user.uid).update({'fcmToken': fcmToken});
+
+      // ALSO save to Realtime Database where your functions expect tokens
+      final dbRef = FirebaseDatabase.instance.ref('fcmTokens/${user.uid}');
+      await dbRef.set(fcmToken);
     }
   } catch (e) {
     print('Error saving FCM token: $e');
@@ -72,6 +84,8 @@ class _HatchTechAppState extends State<HatchTechApp> {
   @override
   void initState() {
     super.initState();
+    startRealtimeListener();
+    
 
     // Initialize local notifications and set up message listeners here.
     // Wrap initialize in try/catch so a MissingPluginException doesn't crash the app.
@@ -111,6 +125,73 @@ class _HatchTechAppState extends State<HatchTechApp> {
       // handle navigation
     });
   }
+
+  Future<void> showLocalNotification(String title, String message) async {
+  const AndroidNotificationDetails androidPlatformChannelSpecifics =
+      AndroidNotificationDetails(
+    'hatchtech_channel',
+    'HatchTech Alerts',
+    importance: Importance.high,
+    priority: Priority.high,
+    showWhen: true,
+  );
+
+  const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidPlatformChannelSpecifics);
+
+  await flutterLocalNotificationsPlugin.show(
+    0,
+    title,
+    message,
+    platformChannelSpecifics,
+  );
+}
+
+final Map<String, Map<String, bool>> previousAlerts = {};
+
+void startRealtimeListener() {
+  final ref = FirebaseDatabase.instance.ref('HatchTech');
+
+  ref.onValue.listen((DatabaseEvent event) {
+    final data = event.snapshot.value as Map?;
+    if (data == null) return;
+
+    data.forEach((key, value) {
+      final incubator = value as Map?;
+      if (incubator == null) return;
+
+      // Initialize previous alert map if not exist
+      previousAlerts.putIfAbsent(key, () => {'tempHigh': false, 'humidityLow': false, 'gasHigh': false});
+
+      double temp = double.tryParse(incubator['temperature']?.toString() ?? '0') ?? 0;
+      double humidity = double.tryParse(incubator['humidity']?.toString() ?? '0') ?? 0;
+
+      bool tempHigh = temp > 39;
+      bool humidityLow = humidity < 35;
+
+      // 🔥 Temperature Alert
+      if (tempHigh && !previousAlerts[key]!['tempHigh']!) {
+        showLocalNotification('🔥 Temperature Alert',
+            '$key temperature is too high: ${temp.toStringAsFixed(1)}°C');
+        previousAlerts[key]!['tempHigh'] = true;
+      } else if (!tempHigh && previousAlerts[key]!['tempHigh']!) {
+        showLocalNotification('✅ Temperature Normal',
+            '$key temperature is back to normal at ${temp.toStringAsFixed(1)}°C.');
+        previousAlerts[key]!['tempHigh'] = false;
+      }
+
+      // 💧 Humidity Alert
+      if (humidityLow && !previousAlerts[key]!['humidityLow']!) {
+        showLocalNotification('💧 Low Humidity Alert',
+            '$key humidity dropped to ${humidity.toStringAsFixed(1)}%.');
+        previousAlerts[key]!['humidityLow'] = true;
+      } else if (!humidityLow && previousAlerts[key]!['humidityLow']!) {
+        showLocalNotification('✅ Humidity Normal',
+            '$key humidity is back to normal at ${humidity.toStringAsFixed(1)}%.');
+        previousAlerts[key]!['humidityLow'] = false;
+      }
+    });
+  });
+}
 
   @override
   Widget build(BuildContext context) {
