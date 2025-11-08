@@ -34,6 +34,10 @@ void main() async {
   const initSettings = InitializationSettings(android: androidInit);
   await flutterLocalNotificationsPlugin.initialize(initSettings);
 
+  await RealtimeNotificationService.instance.init();
+  RealtimeNotificationService.instance.startListening(); // RTDB sensor alerts
+  RealtimeNotificationService.instance.startBatchReminderListener(); // Firestore reminders
+
   // Request notification permissions
   await FirebaseMessaging.instance.requestPermission(
     alert: true,
