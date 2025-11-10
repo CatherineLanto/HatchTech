@@ -1,10 +1,7 @@
-// A small wrapper around flutter_local_notifications to show notifications
-// for foreground messages and create channels on Android.
-// ignore_for_file: use_super_parameters, avoid_print
+// ignore_for_file: avoid_print
 
 import 'dart:async';
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -30,7 +27,6 @@ class FcmLocalNotificationService {
 
     await _flutterLocalNotificationsPlugin.initialize(initSettings,
         onDidReceiveNotificationResponse: (details) {
-      // When user taps notification created by plugin
     });
 
     if (Platform.isAndroid) {
@@ -50,15 +46,12 @@ class FcmLocalNotificationService {
         ?.createNotificationChannel(channel);
   }
 
-  /// Show a local notification from a RemoteMessage, supporting data-only payloads
   Future<void> showNotificationFromRemoteMessage(RemoteMessage message) async {
-    // Extract data-only payload values
     final data = message.data;
     final title = data['title'] ?? 'HatchTech Alert';
     final body = data['body'] ?? 'Check incubator status.';
     final type = data['type'] ?? 'general';
 
-    // For testing: print payload
     print('📩 Data-only message received: $data');
 
     await showNotification(
@@ -74,7 +67,6 @@ class FcmLocalNotificationService {
     String? type,
     BuildContext? context,
   }) async {
-    // Define channel and base settings
     AndroidNotificationDetails androidDetails;
 
     if (type == 'sensor_alert') {
@@ -85,7 +77,7 @@ class FcmLocalNotificationService {
         importance: Importance.high,
         priority: Priority.high,
         color: Colors.redAccent,
-        icon: '@mipmap/ic_launcher', // optional custom icon
+        icon: '@mipmap/ic_launcher', 
       );
     } else if (type == 'maintenance_alert') {
       androidDetails = const AndroidNotificationDetails(
@@ -95,7 +87,7 @@ class FcmLocalNotificationService {
         importance: Importance.high,
         priority: Priority.high,
         color: Colors.orangeAccent,
-        icon: '@mipmap/ic_maintenance', // optional custom icon
+        icon: '@mipmap/ic_maintenance', 
       );
     } else if (type == 'predictive_alert') {
       androidDetails = const AndroidNotificationDetails(
@@ -105,7 +97,7 @@ class FcmLocalNotificationService {
         importance: Importance.high,
         priority: Priority.high,
         color: Colors.blueAccent,
-        icon: '@mipmap/ic_predictive', // optional custom icon
+        icon: '@mipmap/ic_predictive',
       );
     } else {
       androidDetails = const AndroidNotificationDetails(
@@ -132,7 +124,6 @@ class FcmLocalNotificationService {
       notificationDetails,
     );
 
-    // Optional popup if the app is in foreground
     if (type == 'sensor_alert' && context != null) {
       showDialog(
         context: context,
@@ -180,7 +171,6 @@ class _NotificationHostState extends State<_NotificationHost> {
     setState(() {
       _items.insert(0, data);
     });
-    // card will handle its own timer and call remove after exit animation
   }
 
   void remove(Key key) {
@@ -243,7 +233,6 @@ class _FloatingNotificationCardState extends State<_FloatingNotificationCard> wi
   }
 
   void _requestDismiss() {
-    // play reverse then notify host to remove
     _ctrl.reverse().then((_) {
       widget.onRequestDismiss();
     });
@@ -261,7 +250,6 @@ class _FloatingNotificationCardState extends State<_FloatingNotificationCard> wi
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: () {
-        // allow tap-to-dismiss
         _timer?.cancel();
         _requestDismiss();
       },
@@ -309,7 +297,6 @@ class _FloatingNotificationCardState extends State<_FloatingNotificationCard> wi
   }
 }
 
-/// NotificationService manages a single overlay host for stacked floating notifications.
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
   factory NotificationService() => _instance;
@@ -325,7 +312,6 @@ class NotificationService {
     _entry = OverlayEntry(builder: (context) {
       return Positioned.fill(
         child: IgnorePointer(
-          // we want notification cards to be tappable; allow pointer events
           ignoring: false,
           child: SafeArea(child: host),
         ),
@@ -334,7 +320,6 @@ class NotificationService {
     overlay.insert(_entry!);
   }
 
-  /// Show a floating notification
   void show(BuildContext context, String message, {Color? color, IconData? icon, Duration? duration}) {
     _ensureOverlay(context);
     final data = NotificationData(

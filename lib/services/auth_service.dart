@@ -1,19 +1,73 @@
+// ignore_for_file: avoid_print
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class AuthService {
-  // Update user email in Firebase Auth and Firestore
+  static final FirebaseAuth _auth = FirebaseAuth.instance;
+  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // ignore: unused_field
+  static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
+
+  static User? get currentUser => _auth.currentUser;
+
+  // ✅ Save or refresh FCM token
+  static Future<void> saveFcmToken() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) return;
+
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token == null) {
+        print('⚠️ No FCM token generated.');
+        return;
+      }
+
+      // Fetch user doc
+      final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+      final doc = await userRef.get();
+
+      // 🧩 Allow multiple devices per account:
+      // Store tokens in an array (so each device keeps its own)
+      List<dynamic> tokens = [];
+      if (doc.exists && doc.data()!.containsKey('fcmTokens')) {
+        tokens = List<String>.from(doc.data()!['fcmTokens']);
+      }
+
+      if (!tokens.contains(token)) tokens.add(token);
+
+      await userRef.update({'fcmTokens': tokens});
+      print('✅ FCM token saved for ${user.email}: $token');
+
+      // Automatically update when token refreshes
+      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+        final snap = await userRef.get();
+        List<dynamic> currentTokens = [];
+        if (snap.exists && snap.data()!.containsKey('fcmTokens')) {
+          currentTokens = List<String>.from(snap.data()!['fcmTokens']);
+        }
+
+        if (!currentTokens.contains(newToken)) {
+          currentTokens.add(newToken);
+          await userRef.update({'fcmTokens': currentTokens});
+        }
+        print('🔄 Token refreshed: $newToken');
+      });
+    } catch (e) {
+      print('❌ Error saving FCM token: $e');
+    }
+  }
+
+  // ✅ Update user email
   static Future<Map<String, dynamic>> updateUserEmail({
     required String userId,
     required String newEmail,
   }) async {
     try {
-      // Get user by userId
       if (currentUser != null && currentUser!.uid == userId) {
-        // If editing self, send verification before updating Firebase Auth email
         await currentUser!.verifyBeforeUpdateEmail(newEmail);
       }
-      // Update Firestore email
       await _firestore.collection('users').doc(userId).update({'email': newEmail});
       return {'success': true, 'message': 'Email updated successfully!'};
     } on FirebaseAuthException catch (e) {
@@ -36,12 +90,8 @@ class AuthService {
       return {'success': false, 'message': 'Failed to update email. Please try again.'};
     }
   }
-  static final FirebaseAuth _auth = FirebaseAuth.instance;
-  static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  static User? get currentUser => _auth.currentUser;
-
-  // Sign up with email and password
+  // ✅ Sign up with email
   static Future<Map<String, dynamic>> signUp({
     required String email,
     required String password,
@@ -49,7 +99,6 @@ class AuthService {
     required String role,
   }) async {
     try {
-      // Check if username already exists
       final usernameQuery = await _firestore
           .collection('users')
           .where('username_lower', isEqualTo: username.toLowerCase())
@@ -62,13 +111,9 @@ class AuthService {
         };
       }
 
-      // Create user with email and password
-      final UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final UserCredential userCredential =
+          await _auth.createUserWithEmailAndPassword(email: email, password: password);
 
-      // Store user data in Firestore
       await _firestore.collection('users').doc(userCredential.user!.uid).set({
         'username': username,
         'username_lower': username.toLowerCase(),
@@ -76,10 +121,13 @@ class AuthService {
         'role': role,
         'created_at': FieldValue.serverTimestamp(),
         'last_login': FieldValue.serverTimestamp(),
+        'fcmTokens': [], // initialize
       });
 
-      // Update display name
       await userCredential.user!.updateDisplayName(username);
+
+      // 🟢 Save device FCM token
+      await saveFcmToken();
 
       return {
         'success': true,
@@ -107,21 +155,21 @@ class AuthService {
     }
   }
 
-  // Sign in with email and password
+  // ✅ Sign in with email
   static Future<Map<String, dynamic>> signIn({
     required String email,
     required String password,
   }) async {
     try {
-      final UserCredential userCredential = await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final UserCredential userCredential =
+          await _auth.signInWithEmailAndPassword(email: email, password: password);
 
-      // Update last login time
       await _firestore.collection('users').doc(userCredential.user!.uid).update({
         'last_login': FieldValue.serverTimestamp(),
       });
+
+      // 🟢 Save device FCM token
+      await saveFcmToken();
 
       return {
         'success': true,
@@ -152,13 +200,12 @@ class AuthService {
     }
   }
 
-  // Sign in with username and password
+  // ✅ Sign in with username
   static Future<Map<String, dynamic>> signInWithUsername({
     required String username,
     required String password,
   }) async {
     try {
-      // Find user by username
       final usernameQuery = await _firestore
           .collection('users')
           .where('username_lower', isEqualTo: username.toLowerCase())
@@ -171,26 +218,27 @@ class AuthService {
       final userDoc = usernameQuery.docs.first;
       final email = userDoc.data()['email'] as String;
 
-      // Sign in with email
-      return await signIn(email: email, password: password);
+      final result = await signIn(email: email, password: password);
+
+      // 🟢 Save device FCM token (redundant safety)
+      await saveFcmToken();
+
+      return result;
     } catch (e) {
       return {'success': false, 'message': 'An error occurred. Please try again.'};
     }
   }
 
-  // Sign out
+  // ✅ Sign out
   static Future<void> signOut() async {
     await _auth.signOut();
   }
 
-  // Reset password
+  // ✅ Reset password
   static Future<Map<String, dynamic>> resetPassword({required String email}) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
-      return {
-        'success': true,
-        'message': 'Password reset email sent successfully!'
-      };
+      return {'success': true, 'message': 'Password reset email sent successfully!'};
     } on FirebaseAuthException catch (e) {
       String message;
       switch (e.code) {
@@ -209,10 +257,9 @@ class AuthService {
     }
   }
 
-  // Get user data
+  // ✅ Get user data
   static Future<Map<String, dynamic>?> getUserData() async {
     if (currentUser == null) return null;
-
     try {
       final doc = await _firestore.collection('users').doc(currentUser!.uid).get();
       return doc.data();
@@ -221,12 +268,9 @@ class AuthService {
     }
   }
 
-  // Stream user data changes
+  // ✅ Stream user data
   static Stream<Map<String, dynamic>?> getUserDataStream() {
-    if (currentUser == null) {
-      return Stream.value(null);
-    }
-
+    if (currentUser == null) return Stream.value(null);
     return _firestore
         .collection('users')
         .doc(currentUser!.uid)
@@ -234,7 +278,7 @@ class AuthService {
         .map((doc) => doc.exists ? doc.data() : null);
   }
 
-  // Update user profile (username only)
+  // ✅ Update username
   static Future<Map<String, dynamic>> updateUserProfile({
     required String username,
   }) async {
@@ -247,13 +291,11 @@ class AuthService {
         return {'success': false, 'message': 'Username cannot be empty'};
       }
 
-      // Check if username already exists (excluding current user)
       final usernameQuery = await _firestore
           .collection('users')
           .where('username_lower', isEqualTo: username.toLowerCase())
           .get();
 
-      // Check if any other user has this username
       final hasConflict = usernameQuery.docs.any((doc) => doc.id != currentUser!.uid);
 
       if (hasConflict) {
@@ -263,50 +305,31 @@ class AuthService {
         };
       }
 
-      final updates = <String, dynamic>{
+      await currentUser!.updateDisplayName(username);
+      await _firestore.collection('users').doc(currentUser!.uid).update({
         'username': username,
         'username_lower': username.toLowerCase(),
         'updated_at': FieldValue.serverTimestamp(),
-      };
-      
-      // Update display name in Firebase Auth
-      await currentUser!.updateDisplayName(username);
-      
-      // Update username in Firestore
-      await _firestore.collection('users').doc(currentUser!.uid).update(updates);
+      });
 
-      return {
-        'success': true,
-        'message': 'Username updated successfully!',
-      };
-    } on FirebaseAuthException catch (e) {
-      return {'success': false, 'message': 'An error occurred: ${e.message}'};
+      return {'success': true, 'message': 'Username updated successfully!'};
     } catch (e) {
       return {'success': false, 'message': 'Failed to update username. Please try again.'};
     }
   }
 
-  // Check if user is logged in
+  // ✅ Utility
   static bool get isLoggedIn => currentUser != null;
 
-  // Check if user is new (created account within last 5 minutes)
   static Future<bool> isNewUser() async {
     if (currentUser == null) return false;
-
     try {
       final userData = await getUserData();
       if (userData == null) return false;
-
       final createdAt = userData['created_at'] as Timestamp?;
       if (createdAt == null) return false;
-
-      final now = DateTime.now();
-      final accountCreated = createdAt.toDate();
-      final difference = now.difference(accountCreated);
-
-      // Consider user "new" if account was created within last 5 minutes
-      return difference.inMinutes <= 5;
-    } catch (e) {
+      return DateTime.now().difference(createdAt.toDate()).inMinutes <= 5;
+    } catch (_) {
       return false;
     }
   }

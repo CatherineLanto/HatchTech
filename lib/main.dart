@@ -7,12 +7,12 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
-
 import 'firebase_options.dart';
 import 'auth_wrapper.dart';
 import 'services/auth_service.dart';
 import 'services/notification_service.dart';
-import 'services/realtime_notification_service.dart'; // ✅ your new file
+import 'services/realtime_notification_service.dart'; 
+import 'package:hatchtech/services/notification_manager.dart';
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.light);
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
@@ -20,6 +20,26 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterL
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =FlutterLocalNotificationsPlugin();
+
+  const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+    'hatchtech_channel',
+    'HatchTech Alerts',
+    channelDescription: 'Critical environment and hatch notifications',
+    importance: Importance.max,
+    priority: Priority.high,
+    showWhen: true,
+  );
+
+  const NotificationDetails platformDetails = NotificationDetails(android: androidDetails);
+
+  await flutterLocalNotificationsPlugin.show(
+    0,
+    message.notification?.title ?? 'HatchTech Alert',
+    message.notification?.body ?? 'A new alert has been triggered!',
+    platformDetails,
+  );
+
   await FcmLocalNotificationService.instance.init();
   await FcmLocalNotificationService.instance.showNotificationFromRemoteMessage(message);
   print('Handling a background message: ${message.messageId}');
@@ -29,30 +49,28 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
-  // Initialize local notifications
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
   const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
   const initSettings = InitializationSettings(android: androidInit);
   await flutterLocalNotificationsPlugin.initialize(initSettings);
 
+  await NotificationManager.instance.init();
   await RealtimeNotificationService.instance.init();
-  RealtimeNotificationService.instance.startListening(); // RTDB sensor alerts
-  RealtimeNotificationService.instance.startBatchReminderListener(); // Firestore reminders
 
-  // Request notification permissions
   await FirebaseMessaging.instance.requestPermission(
     alert: true,
     badge: true,
     sound: true,
   );
 
-  // Handle FCM background messages
+  await FcmLocalNotificationService.instance.init();
+
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // Retrieve FCM token
   final fcmToken = await FirebaseMessaging.instance.getToken();
   print('📱 FCM Token: $fcmToken');
 
-  // Save token to Firestore + RTDB
   try {
     final user = AuthService.currentUser;
     if (user != null && fcmToken != null) {
@@ -78,15 +96,12 @@ class _HatchTechAppState extends State<HatchTechApp> {
   void initState() {
     super.initState();
 
-    // ✅ Initialize local notifications
     FcmLocalNotificationService.instance.init();
 
-    // ✅ Start real-time listener
     RealtimeNotificationService.instance.init();
     RealtimeNotificationService.instance.startListening();
+    RealtimeNotificationService.instance.startBatchReminderListener();
 
-
-    // ✅ Handle foreground messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       print('📩 Foreground FCM received: ${message.data}');
       final data = message.data;
@@ -100,12 +115,10 @@ class _HatchTechAppState extends State<HatchTechApp> {
       );
     });
 
-    // ✅ Handle app opened from terminated state
     FirebaseMessaging.instance.getInitialMessage().then((message) {
       if (message != null) print('🚀 App opened from terminated state by notification');
     });
 
-    // ✅ Handle background tap
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
       print('📬 Notification caused app to open');
     });

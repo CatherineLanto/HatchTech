@@ -1,6 +1,4 @@
-// lib/services/realtime_notif_service.dart
-// HatchTech Autonomous Real-Time Notification Service
-// Monitors RTDB (HatchTech/...) for threshold violations and Firestore for batch schedules
+// ignore_for_file: avoid_print
 
 import 'dart:async';
 import 'dart:io';
@@ -16,12 +14,11 @@ class RealtimeNotificationService {
   final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  final Map<String, Map<String, bool>> _alertState = {}; // incubator -> param -> active?
-  final Map<String, bool> _batchAlertState = {}; // batch-based alert tracker
+  final Map<String, Map<String, bool>> _alertState = {}; 
+  final Map<String, bool> _batchAlertState = {}; 
   bool _initialized = false;
   bool _firstSnapshotSkipped = false;
 
-  /// Initialize notification channels and permissions
   Future<void> init() async {
     if (_initialized) return;
 
@@ -43,7 +40,6 @@ class RealtimeNotificationService {
     _initialized = true;
   }
 
-  /// Define and register notification channels
   Future<void> _createAndroidChannels() async {
     const channels = [
       AndroidNotificationChannel(
@@ -68,9 +64,6 @@ class RealtimeNotificationService {
     }
   }
 
-  // ---------------------------------------------------------------------------
-  // REALTIME DATABASE MONITORING (for sensor thresholds)
-  // ---------------------------------------------------------------------------
   void startListening() {
     final ref = FirebaseDatabase.instance.ref('HatchTech');
 
@@ -78,7 +71,8 @@ class RealtimeNotificationService {
       final data = event.snapshot.value as Map?;
       if (data == null) return;
 
-      // Avoid flooding on initial full snapshot
+      print('🔍 RTDB listener triggered');
+
       if (!_firstSnapshotSkipped) {
         _firstSnapshotSkipped = true;
         return;
@@ -89,7 +83,6 @@ class RealtimeNotificationService {
         if (incubator == null) return;
         final name = key.toString();
 
-        // Initialize alert states for this incubator
         _alertState.putIfAbsent(name, () => {
               'tempHigh': false,
               'tempLow': false,
@@ -104,7 +97,6 @@ class RealtimeNotificationService {
         final co2 = double.tryParse(incubator['co2']?.toString() ?? '0') ?? 0;
         final oxygen = double.tryParse(incubator['oxygen']?.toString() ?? '0') ?? 0;
 
-        // --- Temperature ---
         if (temp > 39 && !_alertState[name]!['tempHigh']!) {
           _show(
               '🔥 Overheat Alert',
@@ -131,7 +123,6 @@ class RealtimeNotificationService {
           _alertState[name]!['tempLow'] = false;
         }
 
-        // --- Humidity ---
         if (humidity < 40 && !_alertState[name]!['humidityLow']!) {
           _show('💧 Low Humidity',
               '$name humidity dropped to ${humidity.toStringAsFixed(1)}%',
@@ -156,7 +147,6 @@ class RealtimeNotificationService {
           _alertState[name]!['humidityHigh'] = false;
         }
 
-        // --- CO2 ---
         if (co2 > 1000 && !_alertState[name]!['co2High']!) {
           _show('🌫️ CO₂ Alert',
               '$name CO₂ level high: ${co2.toStringAsFixed(1)} ppm',
@@ -169,7 +159,6 @@ class RealtimeNotificationService {
           _alertState[name]!['co2High'] = false;
         }
 
-        // --- Oxygen ---
         if (oxygen < 19.5 && !_alertState[name]!['oxygenLow']!) {
           _show('🫁 Low Oxygen Alert',
               '$name oxygen level low: ${oxygen.toStringAsFixed(1)}%',
@@ -185,9 +174,6 @@ class RealtimeNotificationService {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // FIRESTORE MONITORING (for batch candling & hatching reminders)
-  // ---------------------------------------------------------------------------
   void startBatchReminderListener() {
     final firestore = FirebaseFirestore.instance.collection('batchHistory');
 
@@ -210,10 +196,8 @@ class RealtimeNotificationService {
 
         final daysToHatch = hatchDate.difference(now).inDays;
 
-        // Initialize state
         _batchAlertState.putIfAbsent(batchName, () => false);
 
-        // --- Hatching Reminder ---
         if (daysToHatch <= 1 && !_batchAlertState[batchName]!) {
           _show('🐣 Hatching Soon!',
               '$batchName in $incubator will hatch in $daysToHatch day(s)!',
@@ -221,7 +205,6 @@ class RealtimeNotificationService {
           _batchAlertState[batchName] = true;
         }
 
-        // --- Candling Reminders ---
         if (data['candlingDates'] != null && data['candlingDates'] is Map) {
           final candling = Map<String, dynamic>.from(data['candlingDates']);
           final daysSinceStart = now.difference(startDate).inDays;
@@ -232,11 +215,9 @@ class RealtimeNotificationService {
                 daysSinceStart >= int.parse(day)) {
               _show(
                 '🔦 Candling Reminder',
-                '$batchName in $incubator is due for candling (Day $day).',
+                '$batchName in $incubator is due for candling.',
                 'hatchtech_batch_reminders',
               );
-              // Optional: update Firestore to mark as notified
-              // firestore.doc(doc.id).update({'candlingDates.$day': true});
             }
           });
         }
@@ -244,9 +225,6 @@ class RealtimeNotificationService {
     });
   }
 
-  // ---------------------------------------------------------------------------
-  // Helper to show local notification
-  // ---------------------------------------------------------------------------
   Future<void> _show(String title, String body, String channelId) async {
     final android = AndroidNotificationDetails(
       channelId,

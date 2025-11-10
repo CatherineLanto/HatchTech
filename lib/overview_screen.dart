@@ -45,18 +45,31 @@ class _OverviewPageState extends State<OverviewPage> {
   DateTime? _lastHatchNotification;
   DateTime? _lastWarningNotification;
   final Map<String, DateTime> _lastCandlingNotification = {};
-  // Modern notification helper
-  void showModernNotification(String message, {Color? color, IconData? icon}) {
-    if (!mounted) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      NotificationService().show(
-        context,
-        message,
-        color: color ?? Colors.blueAccent,
-        icon: icon,
-      );
-    });
-  }
+  void showModernNotification(
+  String message, {
+  Color? color,
+  IconData? icon,
+  String? title,
+  String? type,
+}) async {
+  if (!mounted) return;
+
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    NotificationService().show(
+      context,
+      message,
+      color: color ?? Colors.blueAccent,
+      icon: icon,
+    );
+  });
+
+  await FcmLocalNotificationService.instance.showNotification(
+    title: title ?? 'HatchTech Alert',
+    body: message,
+    type: type ?? 'sensor_alert',
+  );
+}
+
   bool get isOwnerOrAdmin {
     final roleLower = (widget.userRole ?? '').toLowerCase();
     return roleLower.contains('owner') || roleLower.contains('admin');
@@ -96,7 +109,6 @@ class _OverviewPageState extends State<OverviewPage> {
         }
       });
     });
-    // Listen to batch history similar to AnalyticsScreen so Overview reflects same data
     _batchHistorySub = FirebaseFirestore.instance.collection('batchHistory').snapshots().listen((snapshot) {
       final List<Map<String, dynamic>> fetchedHistory = [];
       for (var doc in snapshot.docs) {
@@ -182,7 +194,6 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
   void _updateCounts() {
-    // Hatching date notifications (<=2 days left)
     final now = DateTime.now();
     for (final name in incubators) {
       final data = _currentIncubatorData[name];
@@ -243,7 +254,6 @@ class _OverviewPageState extends State<OverviewPage> {
         normalCount = normal;
         warningCount = warnings;
       });
-      // Throttle warning notifications to avoid spamming
       if (warningCount > 0) {
         final now = DateTime.now();
         if (_lastWarningNotification == null || now.difference(_lastWarningNotification!).inSeconds > 15) {
@@ -259,7 +269,6 @@ class _OverviewPageState extends State<OverviewPage> {
       }
     }
   }
-
 
   String _getBatchSummary(String incubatorName) {
     final data = _currentIncubatorData[incubatorName];
@@ -325,7 +334,6 @@ class _OverviewPageState extends State<OverviewPage> {
                       themeNotifier: widget.themeNotifier,
                       userName: userName,
                       onUserNameChanged: () async {
-                        // Refresh user data from Firebase
                         final userData = await AuthService.getUserData();
                         if (mounted && userData != null) {
                           setState(() {
@@ -592,86 +600,84 @@ class _OverviewPageState extends State<OverviewPage> {
                 )),
           ],
 
-          // --- Maintenance Section ---
           const SizedBox(height: 20),
-GestureDetector(
-  onTap: () {
-    widget.onNavigateToMaintenance?.call();
-  },
-  child: Card(
-    elevation: 2,
-    color: isDarkMode ? const Color(0xFF0F1B2D) : const Color(0xFFE3F2FD),
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    child: Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: const [
-              Icon(Icons.build_circle_rounded, color: Colors.blueAccent, size: 28),
-              SizedBox(width: 10),
-              Text(
-                "Maintenance",
-                style: TextStyle(
-                  fontSize: 18,
-                  color: Colors.blueAccent,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 10),
-
-          FutureBuilder<Map<String, dynamic>>(
-            future: FirebaseDatabase.instance
-                .ref("HatchTech/Maintenance")
-                .get()
-                .then((snapshot) => (snapshot.value ?? {}) as Map<String, dynamic>),
-            builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                return const Text(
-                  "No recent maintenance records found.",
-                  style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
-                );
-              }
-
-              final maintenanceRecords = snapshot.data!;
-              final entries = maintenanceRecords.entries.toList()
-                ..sort((a, b) => b.value['timestamp'].compareTo(a.value['timestamp']));
-
-              final latestRecords = entries.take(3).toList();
-
-              return Column(
-                children: latestRecords.map((entry) {
-                  final data = entry.value;
-                  final date = DateTime.fromMillisecondsSinceEpoch(data['timestamp']);
-                  final formattedDate =
-                      "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
-
-                  return Card(
-                    color: isDarkMode ? const Color(0xFF0F1B2D) : Colors.blue.shade50,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    child: ListTile(
-                      leading: const Icon(Icons.settings, color: Colors.blueAccent),
-                      title: Text(
-                        data['task'] ?? 'Maintenance Task',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: Text("Date: $formattedDate\nBy: ${data['performedBy'] ?? 'N/A'}"),
-                    ),
-                  );
-                }).toList(),
-              );
+          GestureDetector(
+            onTap: () {
+              widget.onNavigateToMaintenance?.call();
             },
+            child: Card(
+              elevation: 2,
+              color: isDarkMode ? const Color(0xFF0F1B2D) : const Color(0xFFE3F2FD),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.build_circle_rounded, color: Colors.blueAccent, size: 28),
+                        SizedBox(width: 10),
+                        Text(
+                          "Maintenance",
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.blueAccent,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+
+                    FutureBuilder<Map<String, dynamic>>(
+                      future: FirebaseDatabase.instance
+                        .ref("HatchTech/Maintenance")
+                        .get()
+                        .then((snapshot) => (snapshot.value ?? {}) as Map<String, dynamic>),
+                        builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(child: CircularProgressIndicator());
+                        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                          return const Text(
+                            "No recent maintenance records found.",
+                            style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
+                          );
+                        }
+
+                        final maintenanceRecords = snapshot.data!;
+                        final entries = maintenanceRecords.entries.toList()
+                          ..sort((a, b) => b.value['timestamp'].compareTo(a.value['timestamp']));
+                        final latestRecords = entries.take(3).toList();
+
+                      return Column(
+                        children: latestRecords.map((entry) {
+                          final data = entry.value;
+                          final date = DateTime.fromMillisecondsSinceEpoch(data['timestamp']);
+                          final formattedDate =
+                            "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+
+                          return Card(
+                            color: isDarkMode ? const Color(0xFF0F1B2D) : Colors.blue.shade50,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            child: ListTile(
+                              leading: const Icon(Icons.settings, color: Colors.blueAccent),
+                              title: Text(
+                                data['task'] ?? 'Maintenance Task',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              subtitle: Text("Date: $formattedDate\nBy: ${data['performedBy'] ?? 'N/A'}"),
+                            ),
+                          );
+                        }).toList(),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
           ),
-        ],
-      ),
-    ),
-  ),
-),
+        ),
 
 
           if (normalIncubators.isEmpty && warningIncubators.isEmpty) ...[
@@ -722,18 +728,13 @@ GestureDetector(
     final batchHistoryData = (widget.batchHistory != null && widget.batchHistory!.isNotEmpty)
         ? widget.batchHistory!
         : _localBatchHistory;
-    // import helper
-    // avoid unused import lint by referencing the helper methods below
-    // (actual import added at top of file)
     
     final double rateValue = calculateOverallHatchRate(batchHistoryData);
-    final String hatchRate = rateValue > 0 ? '${rateValue.toStringAsFixed(1)}%' : 'N/A';
-    // Candling notification logic
+    final String hatchRate = rateValue > 0 ? '${rateValue.toStringAsFixed(1)}%' : 'N/A'; 
     final now = DateTime.now();
     dataSource.forEach((name, data) {
       final int startDateMs = data['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
       final DateTime startDate = DateTime.fromMillisecondsSinceEpoch(startDateMs);
-  // Removed unused daysElapsed variable
       bool isCompleted = false;
       if (batchHistoryData.isNotEmpty) {
         final batchName = data['batchName'] ?? '';
@@ -762,7 +763,6 @@ GestureDetector(
       }
     });
     
-    // Use shared helper to determine next candling date
     String nextCandlingDate = getNextCandlingDate(dataSource, batchHistoryData);
 
     return Card(
