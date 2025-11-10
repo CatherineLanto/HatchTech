@@ -7,6 +7,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'profile_screen.dart';
 import 'services/auth_service.dart';
+import 'services/incubator_status.dart';
 
 class Dashboard extends StatefulWidget {
   final String incubatorName;
@@ -672,6 +673,10 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   super.dispose();
   }
 
+  IncubatorStatusService getStatusService(String incubatorId) {
+    return IncubatorStatusService(incubatorId);
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!incubatorData.containsKey(selectedIncubator)) {
@@ -711,7 +716,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                         onUserNameChanged: () async {
                           final user = AuthService.currentUser;
                           if (user != null) {
-                            // ...existing code...
                           }
                         },
                       ),
@@ -823,14 +827,32 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                           child: DropdownButtonFormField<String>(
                             value: selectedIncubator,
                             items: incubatorData.keys.map((key) {
+                              final statusService = getStatusService(key);
                               return DropdownMenuItem(
                                 value: key,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(key),
-                                    if (isDropdownOpen && isOwnerOrAdmin)
-                                      IconButton(
+                                child: StreamBuilder<bool>(
+                                  stream: statusService.onlineStatusStream,
+                                  builder: (context, snapshot) {
+                                    final bool isOnline = snapshot.data ?? false;
+                                    final Color statusColor = isOnline ? Colors.green : Colors.red;
+
+                                    return Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Container(
+                                        width: 10,
+                                        height: 10,
+                                        margin: const EdgeInsets.only(right: 8),
+                                        decoration: BoxDecoration(
+                                          color: statusColor,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      Text(key),
+                                      const Spacer(), 
+                        
+                                      if (isDropdownOpen && isOwnerOrAdmin)
+                                        IconButton(
                                         icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
                                         onPressed: () {
                                           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -838,13 +860,43 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                                           });
                                         },
                                       ),
-                                  ],
-                                ),
+                                    ],
+                                  );
+                                },
+                              ),
+                            );
+                          }).toList(),
+
+                          selectedItemBuilder: (context) {
+                            return incubatorData.keys.map((key) {
+                              if (key != selectedIncubator) return const SizedBox.shrink();
+      
+                              final statusService = getStatusService(key);
+
+                              return StreamBuilder<bool>(
+                                stream: statusService.onlineStatusStream,
+                                builder: (context, snapshot) {
+                                  final bool isOnline = snapshot.data ?? false;
+                                  final Color statusColor = isOnline ? Colors.green : Colors.red;
+
+                                  return Row(
+                                    children: [
+                                      Container(
+                                        width: 10,
+                                        height: 10,
+                                        margin: const EdgeInsets.only(right: 8),
+                                        decoration: BoxDecoration(
+                                          color: statusColor,
+                                          shape: BoxShape.circle,
+                                        ),
+                                      ),
+                                      Text(key),
+                                    ],
+                                  );
+                                },
                               );
-                            }).toList(),
-                            selectedItemBuilder: (context) {
-                              return incubatorData.keys.map((key) => Text(key)).toList();
-                            },
+                            }).toList();
+                          },
                             onChanged: (value) {
                               if (value != null) {
                                 setState(() {

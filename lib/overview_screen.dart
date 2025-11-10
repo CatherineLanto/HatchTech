@@ -63,11 +63,6 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   });
 
-  await FcmLocalNotificationService.instance.showNotification(
-    title: title ?? 'HatchTech Alert',
-    body: message,
-    type: type ?? 'sensor_alert',
-  );
 }
 
   bool get isOwnerOrAdmin {
@@ -206,11 +201,6 @@ class _OverviewPageState extends State<OverviewPage> {
         if (daysRemaining <= 2 && daysRemaining > 0) {
           if (_lastHatchNotification == null || now.difference(_lastHatchNotification!).inHours > 6) {
             WidgetsBinding.instance.addPostFrameCallback((_) {
-              showModernNotification(
-                "$name: Only $daysRemaining day(s) left until hatching!",
-                color: Colors.amber,
-                icon: Icons.egg,
-              );
             });
             _lastHatchNotification = now;
           }
@@ -258,11 +248,6 @@ class _OverviewPageState extends State<OverviewPage> {
         final now = DateTime.now();
         if (_lastWarningNotification == null || now.difference(_lastWarningNotification!).inSeconds > 15) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            showModernNotification(
-              "$warningCount incubator(s) need attention!",
-              color: Colors.redAccent,
-              icon: Icons.warning,
-            );
           });
           _lastWarningNotification = now;
         }
@@ -679,7 +664,6 @@ class _OverviewPageState extends State<OverviewPage> {
           ),
         ),
 
-
           if (normalIncubators.isEmpty && warningIncubators.isEmpty) ...[
             const SizedBox(height: 20),
             Card(
@@ -749,11 +733,6 @@ class _OverviewPageState extends State<OverviewPage> {
             final lastNotify = _lastCandlingNotification['${name}_$day'];
             if (lastNotify == null || now.difference(lastNotify).inHours > 6) {
               WidgetsBinding.instance.addPostFrameCallback((_) {
-                showModernNotification(
-                  "$name: Candling scheduled in $daysToCandling day(s) (Day $day)",
-                  color: Colors.lightBlue,
-                  icon: Icons.lightbulb,
-                );
               });
               _lastCandlingNotification['${name}_$day'] = now;
             }
