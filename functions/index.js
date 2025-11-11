@@ -1,146 +1,98 @@
-// The Cloud Functions for Firebase SDK
-const functions = require("firebase-functions");
-// The Firebase Admin SDK to access RTDB and FCM
-const admin = require("firebase-admin");
-
-// Initialize Firebase Admin SDK (uses default service account)
+const functions = require('firebase-functions');
+const admin = require('firebase-admin');
 admin.initializeApp();
 
-// --- Helper Function to Fetch All FCM Tokens ---
-async function getAllFCMTokens() {
-  const snapshot = await admin.database().ref("/fcmTokens").once("value");
+const db = admin.database(); // Realtime Database
+const firestore = admin.firestore(); // Firestore for storing tokens
 
-  if (!snapshot.exists()) {
-    functions.logger.log("⚠️ No FCM tokens found in RTDB.");
-    return [];
-  }
+// Thresholds (adjust to your needs)
+const THRESHOLDS = {
+    tempHigh: 39,
+    tempLow: 36.5,
+    humidityLow: 40,
+    humidityHigh: 70,
+    co2High: 1000,
+    oxygenLow: 19
+};
 
-  const tokens = Object.values(snapshot.val() || {});
-  return tokens;
-}
+// Trigger when any incubator data changes
+exports.sendSensorAlert = functions.database.ref('/HatchTech/{incubatorId}')
+    .onUpdate(async (change, context) => {
+        const newData = change.after.val();
+        if (!newData) return null;
 
-// ------------------------------------------------
-// =============== SENSOR ALERTS ==================
-// ------------------------------------------------
-exports.sensorAlert = functions.database
-  .ref("/incubators/{incubatorId}/sensors/{sensorType}")
-  .onUpdate(async (change, context) => {
-    if (!change.after.exists()) return null;
+        const incubatorName = context.params.incubatorId;
+        let notifications = [];
 
-    const sensorValue = change.after.val();
-    const sensorType = context.params.sensorType;
-    const incubatorId = context.params.incubatorId;
+        // Temperature
+        if (newData.temperature > THRESHOLDS.tempHigh) {
+            notifications.push({
+                title: "🔥 Overheat Alert",
+                body: `${incubatorName} temperature too high: ${newData.temperature}°C`
+            });
+        } else if (newData.temperature < THRESHOLDS.tempLow) {
+            notifications.push({
+                title: "❄️ Low Temperature",
+                body: `${incubatorName} temperature too low: ${newData.temperature}°C`
+            });
+        }
 
-    let alertTitle = "";
-    let alertBody = "";
-    let shouldAlert = false;
+        // Humidity
+        if (newData.humidity > THRESHOLDS.humidityHigh) {
+            notifications.push({
+                title: "💦 High Humidity",
+                body: `${incubatorName} humidity too high: ${newData.humidity}%`
+            });
+        } else if (newData.humidity < THRESHOLDS.humidityLow) {
+            notifications.push({
+                title: "💧 Low Humidity",
+                body: `${incubatorName} humidity too low: ${newData.humidity}%`
+            });
+        }
 
-    // --- ALERT LOGIC ---
-    if (sensorType === "temperature" && sensorValue > 39.5) {
-      alertTitle = "🔥 High Temperature Alert";
-      alertBody = `Incubator ${incubatorId} temperature is ${sensorValue}°C! Cooling activated.`;
-      shouldAlert = true;
-    } else if (sensorType === "humidity" && sensorValue < 40) {
-      alertTitle = "💧 Low Humidity Alert";
-      alertBody = `Incubator ${incubatorId} humidity dropped to ${sensorValue}%. Humidifier on.`;
-      shouldAlert = true;
-    } else if (sensorType === "gas" && sensorValue > 200) {
-      alertTitle = "☣️ Air Quality Alert";
-      alertBody = `Incubator ${incubatorId} detected high gas level: ${sensorValue}ppm.`;
-      shouldAlert = true;
-    }
+        // CO2
+        if (newData.co2 > THRESHOLDS.co2High) {
+            notifications.push({
+                title: "🌫️ CO₂ Alert",
+                body: `${incubatorName} CO₂ level high: ${newData.co2} ppm`
+            });
+        }
 
-    if (shouldAlert) {
-      const tokens = await getAllFCMTokens();
-      if (tokens.length === 0) return null;
+        // Oxygen
+        if (newData.oxygen < THRESHOLDS.oxygenLow) {
+            notifications.push({
+                title: "🫁 Low Oxygen Alert",
+                body: `${incubatorName} oxygen low: ${newData.oxygen}%`
+            });
+        }
 
-      const payload = {
-        notification: {
-          title: alertTitle,
-          body: alertBody,
-        },
-        data: {
-          title: alertTitle,
-          body: alertBody,
-          type: "sensor_alert",
-          incubatorId: incubatorId,
-          sensorValue: String(sensorValue),
-          sensorType: sensorType,
-        },
-      };
+        if (notifications.length === 0) return null;
 
-      const options = {
-        priority: "high",
-        timeToLive: 60 * 60, // 1 hour
-      };
+        // Get all FCM tokens from Firestore
+        const tokensSnapshot = await firestore.collection('users').get();
+        const tokens = tokensSnapshot.docs
+            .map(doc => doc.data().fcmToken)
+            .filter(token => !!token);
 
-      try {
-        const response = await admin.messaging().sendToDevice(tokens, payload, options);
-        functions.logger.log(`✅ Sent ${sensorType} alert for incubator ${incubatorId}`, response.results);
-      } catch (error) {
-        functions.logger.error(`❌ Error sending ${sensorType} alert:`, error);
-      }
-    }
+        if (tokens.length === 0) return null;
 
-    return null;
-  });
+        // Send notifications to all tokens
+        const messages = notifications.map(notif => ({
+            notification: {
+                title: notif.title,
+                body: notif.body
+            },
+            tokens: tokens
+        }));
 
-// ---------------------------------------------------
-// =============== MAINTENANCE ALERTS ================
-// ---------------------------------------------------
-exports.maintenanceAlert = functions.database
-  .ref("/incubators/{incubatorId}/maintenance/status")
-  .onUpdate(async (change, context) => {
-    if (!change.after.exists()) return null;
+        for (const message of messages) {
+            try {
+                const response = await admin.messaging().sendMulticast(message);
+                console.log('Notifications sent:', response.successCount);
+            } catch (error) {
+                console.error('Error sending notifications:', error);
+            }
+        }
 
-    const newStatus = change.after.val();
-    const incubatorId = context.params.incubatorId;
-
-    let alertTitle = "";
-    let alertBody = "";
-    let shouldAlert = false;
-
-    // --- ALERT LOGIC ---
-    if (newStatus === "due") {
-      alertTitle = "🧰 Maintenance Due";
-      alertBody = `Incubator ${incubatorId} requires scheduled maintenance.`;
-      shouldAlert = true;
-    } else if (newStatus === "fault") {
-      alertTitle = "⚠️ Equipment Fault Detected";
-      alertBody = `A possible malfunction was detected in Incubator ${incubatorId}.`;
-      shouldAlert = true;
-    }
-
-    if (shouldAlert) {
-      const tokens = await getAllFCMTokens();
-      if (tokens.length === 0) return null;
-
-      const payload = {
-        notification: {
-          title: alertTitle,
-          body: alertBody,
-        },
-        data: {
-          title: alertTitle,
-          body: alertBody,
-          type: "maintenance_alert",
-          incubatorId: incubatorId,
-          status: newStatus,
-        },
-      };
-
-      const options = {
-        priority: "high",
-        timeToLive: 60 * 60,
-      };
-
-      try {
-        const response = await admin.messaging().sendToDevice(tokens, payload, options);
-        functions.logger.log(`✅ Sent maintenance alert for incubator ${incubatorId}`, response.results);
-      } catch (error) {
-        functions.logger.error(`❌ Error sending maintenance alert:`, error);
-      }
-    }
-
-    return null;
-  });
+        return null;
+    });

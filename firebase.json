@@ -35,7 +35,6 @@
       "source": "functions"
     },
     {
-      "source": "alerts",
       "codebase": "notif",
       "ignore": [
         "node_modules",
@@ -43,7 +42,8 @@
         "firebase-debug.log",
         "firebase-debug.*.log",
         "*.local"
-      ]
+      ],
+      "source": "alerts"
     }
   ]
 }

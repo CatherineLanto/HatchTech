@@ -5,14 +5,6 @@ plugins {
     id 'dev.flutter.flutter-gradle-plugin'
 }
 
-def localProperties = new Properties()
-def localPropertiesFile = rootProject.file("app/key.properties")  // Updated: standard location
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.withReader('UTF-8') { reader ->
-        localProperties.load(reader)
-    }
-}
-
 android {
     namespace "com.example.hatchtech"
     compileSdkVersion flutter.compileSdkVersion
@@ -27,27 +19,20 @@ android {
     }
 
     signingConfigs {
-    release {
-        // Check if the storeFile property is available from key.properties
-        def keyStoreFile = localProperties.getProperty('storeFile')
-        if (keyStoreFile == null) {
-            // If key.properties failed to load, fall back to a known-to-fail path to ensure error is clear
-            keyStoreFile = 'release-keystore.jks'  // Updated: relative to android/app/
+        release {
+            keyAlias 'hatchtechkey'
+            keyPassword 'Hatchtech123!'
+            storeFile file('release-keystore.jks')
+            storePassword 'Hatchtech123!'
         }
-        
-        keyAlias localProperties.getProperty('keyAlias')
-        keyPassword localProperties.getProperty('keyPassword')
-        storeFile file(keyStoreFile) 
-        storePassword localProperties.getProperty('storePassword')
     }
-}
 
     buildTypes {
         release {
-            // Use the real release key, not debug
             signingConfig signingConfigs.release
             minifyEnabled false
             shrinkResources false
+            // You can re-enable optimization later once signing works
         }
     }
 

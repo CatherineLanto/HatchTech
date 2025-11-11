@@ -48,7 +48,7 @@
             android:value="2" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="default_channel_id" />
+            android:value="hatchtech_alerts" />
         <meta-data
             android:name="com.google.firebase.analytics.default_analytics_collection_enabled"
             android:value="true" />

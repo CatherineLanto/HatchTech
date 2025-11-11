@@ -20,29 +20,27 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterL
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =FlutterLocalNotificationsPlugin();
+  await FcmLocalNotificationService.instance.showNotificationFromRemoteMessage(message);
 
   const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-    'hatchtech_channel',
+    'hatchtech_alerts',
     'HatchTech Alerts',
-    channelDescription: 'Critical environment and hatch notifications',
+    channelDescription: 'Sensor and batch notifications',
     importance: Importance.max,
     priority: Priority.high,
-    showWhen: true,
+    icon: '@mipmap/ic_launcher',
   );
 
   const NotificationDetails platformDetails = NotificationDetails(android: androidDetails);
 
   await flutterLocalNotificationsPlugin.show(
-    0,
+    DateTime.now().millisecondsSinceEpoch ~/ 1000,
     message.notification?.title ?? 'HatchTech Alert',
-    message.notification?.body ?? 'A new alert has been triggered!',
+    message.notification?.body ?? 'Check your incubator',
     platformDetails,
   );
 
-  await FcmLocalNotificationService.instance.init();
-  await FcmLocalNotificationService.instance.showNotificationFromRemoteMessage(message);
-  print('Handling a background message: ${message.messageId}');
+  print('Background/terminated notification handled: ${message.messageId}');
 }
 
 void main() async {
@@ -65,8 +63,6 @@ void main() async {
   );
 
   await FcmLocalNotificationService.instance.init();
-
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
   final fcmToken = await FirebaseMessaging.instance.getToken();
   print('📱 FCM Token: $fcmToken');
@@ -95,8 +91,6 @@ class _HatchTechAppState extends State<HatchTechApp> {
   @override
   void initState() {
     super.initState();
-
-    FcmLocalNotificationService.instance.init();
 
     RealtimeNotificationService.instance.init();
     RealtimeNotificationService.instance.startListening();

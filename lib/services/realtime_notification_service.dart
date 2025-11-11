@@ -108,7 +108,7 @@ class RealtimeNotificationService {
         if (temp > 39 && !_alertState[name]!['tempHigh']!) {
           _show('🔥 Overheat Alert', '$name temperature too high: ${temp.toStringAsFixed(1)}°C', 'hatchtech_sensor_alerts');
           _alertState[name]!['tempHigh'] = true;
-        } else if (temp >= 37 && _alertState[name]!['tempHigh']!) {
+        } else if (temp <= 39 && _alertState[name]!['tempHigh']!) {
           _show('✅ Temperature Normal', '$name back to normal at ${temp.toStringAsFixed(1)}°C', 'hatchtech_sensor_alerts');
           _alertState[name]!['tempHigh'] = false;
         }
