@@ -5,10 +5,12 @@ plugins {
     id 'dev.flutter.flutter-gradle-plugin'
 }
 
-def keystorePropertiesFile = rootProject.file("android/key.properties")
-def keystoreProperties = new Properties()
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file("app/key.properties")  // Updated: standard location
+if (localPropertiesFile.exists()) {
+    localPropertiesFile.withReader('UTF-8') { reader ->
+        localProperties.load(reader)
+    }
 }
 
 android {
@@ -25,13 +27,20 @@ android {
     }
 
     signingConfigs {
-        release {
-            keyAlias keystoreProperties['keyAlias']
-            keyPassword keystoreProperties['keyPassword']
-            storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
-            storePassword keystoreProperties['storePassword']
+    release {
+        // Check if the storeFile property is available from key.properties
+        def keyStoreFile = localProperties.getProperty('storeFile')
+        if (keyStoreFile == null) {
+            // If key.properties failed to load, fall back to a known-to-fail path to ensure error is clear
+            keyStoreFile = 'release-keystore.jks'  // Updated: relative to android/app/
         }
+        
+        keyAlias localProperties.getProperty('keyAlias')
+        keyPassword localProperties.getProperty('keyPassword')
+        storeFile file(keyStoreFile) 
+        storePassword localProperties.getProperty('storePassword')
     }
+}
 
     buildTypes {
         release {
