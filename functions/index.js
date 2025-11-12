@@ -1,98 +1,109 @@
-const functions = require('firebase-functions');
+const { onValueWritten } = require('firebase-functions/v2/database');
+const { logger } = require('firebase-functions');
 const admin = require('firebase-admin');
+
 admin.initializeApp();
 
-const db = admin.database(); // Realtime Database
-const firestore = admin.firestore(); // Firestore for storing tokens
+const firestore = admin.firestore();
 
-// Thresholds (adjust to your needs)
+// Thresholds for alert conditions
 const THRESHOLDS = {
-    tempHigh: 39,
-    tempLow: 36.5,
-    humidityLow: 40,
-    humidityHigh: 70,
-    co2High: 1000,
-    oxygenLow: 19
+  tempHigh: 39,
+  tempLow: 36.5,
+  humidityHigh: 70,
+  humidityLow: 40,
+  co2High: 1000,
+  oxygenLow: 19,
 };
 
-// Trigger when any incubator data changes
-exports.sendSensorAlert = functions.database.ref('/HatchTech/{incubatorId}')
-    .onUpdate(async (change, context) => {
-        const newData = change.after.val();
-        if (!newData) return null;
+// Trigger whenever any incubator data changes
+exports.sendSensorAlert = onValueWritten('/HatchTech/{incubatorId}', async (event) => {
+  const beforeData = event.data.before.val();
+  const newData = event.data.after.val();
 
-        const incubatorName = context.params.incubatorId;
-        let notifications = [];
+  // Exit if no new data or nothing actually changed
+  if (!newData || JSON.stringify(beforeData) === JSON.stringify(newData)) {
+    return null;
+  }
 
-        // Temperature
-        if (newData.temperature > THRESHOLDS.tempHigh) {
-            notifications.push({
-                title: "🔥 Overheat Alert",
-                body: `${incubatorName} temperature too high: ${newData.temperature}°C`
-            });
-        } else if (newData.temperature < THRESHOLDS.tempLow) {
-            notifications.push({
-                title: "❄️ Low Temperature",
-                body: `${incubatorName} temperature too low: ${newData.temperature}°C`
-            });
-        }
+  const incubatorName = event.params.incubatorId;
+  let notifications = [];
 
-        // Humidity
-        if (newData.humidity > THRESHOLDS.humidityHigh) {
-            notifications.push({
-                title: "💦 High Humidity",
-                body: `${incubatorName} humidity too high: ${newData.humidity}%`
-            });
-        } else if (newData.humidity < THRESHOLDS.humidityLow) {
-            notifications.push({
-                title: "💧 Low Humidity",
-                body: `${incubatorName} humidity too low: ${newData.humidity}%`
-            });
-        }
+  // Temperature alerts
+  if (newData.temperature > THRESHOLDS.tempHigh) {
+    notifications.push(`Temperature too high: ${newData.temperature}°C`);
+  } else if (newData.temperature < THRESHOLDS.tempLow) {
+    notifications.push(`Temperature too low: ${newData.temperature}°C`);
+  }
 
-        // CO2
-        if (newData.co2 > THRESHOLDS.co2High) {
-            notifications.push({
-                title: "🌫️ CO₂ Alert",
-                body: `${incubatorName} CO₂ level high: ${newData.co2} ppm`
-            });
-        }
+  // Humidity alerts
+  if (newData.humidity > THRESHOLDS.humidityHigh) {
+    notifications.push(`Humidity too high: ${newData.humidity}%`);
+  } else if (newData.humidity < THRESHOLDS.humidityLow) {
+    notifications.push(`Humidity too low: ${newData.humidity}%`);
+  }
 
-        // Oxygen
-        if (newData.oxygen < THRESHOLDS.oxygenLow) {
-            notifications.push({
-                title: "🫁 Low Oxygen Alert",
-                body: `${incubatorName} oxygen low: ${newData.oxygen}%`
-            });
-        }
+  // CO2 alert
+  if (newData.co2 > THRESHOLDS.co2High) {
+    notifications.push(`CO₂ level high: ${newData.co2} ppm`);
+  }
 
-        if (notifications.length === 0) return null;
+  // Oxygen alert
+  if (newData.oxygen < THRESHOLDS.oxygenLow) {
+    notifications.push(`Oxygen level low: ${newData.oxygen}%`);
+  }
 
-        // Get all FCM tokens from Firestore
-        const tokensSnapshot = await firestore.collection('users').get();
-        const tokens = tokensSnapshot.docs
-            .map(doc => doc.data().fcmToken)
-            .filter(token => !!token);
+  // If no alerts, exit quietly
+  if (notifications.length === 0) {
+    logger.info(`✅ No issues detected for ${incubatorName}`);
+    return null;
+  }
 
-        if (tokens.length === 0) return null;
+  // Combine alerts into one message
+  const combinedBody = notifications.join('\n');
 
-        // Send notifications to all tokens
-        const messages = notifications.map(notif => ({
-            notification: {
-                title: notif.title,
-                body: notif.body
-            },
-            tokens: tokens
-        }));
+  // 🔹 Option 1: Send to ALL users (current behavior)
+  const tokensSnapshot = await firestore.collection('users').get();
 
-        for (const message of messages) {
-            try {
-                const response = await admin.messaging().sendMulticast(message);
-                console.log('Notifications sent:', response.successCount);
-            } catch (error) {
-                console.error('Error sending notifications:', error);
-            }
-        }
+  // 🔹 Option 2: To send only to users who manage this incubator,
+  // uncomment this line and remove the one above:
+  // const tokensSnapshot = await firestore.collection('users')
+  //   .where('incubators', 'array-contains', incubatorName)
+  //   .get();
 
-        return null;
-    });
+  const tokens = tokensSnapshot.docs
+    .map(doc => doc.data().fcmToken)
+    .filter(Boolean);
+
+  if (tokens.length === 0) {
+    logger.info('⚠️ No FCM tokens found.');
+    return null;
+  }
+
+  // Build notification payload
+  const message = {
+    notification: {
+      title: `⚠️ ${incubatorName} Alert`,
+      body: combinedBody,
+    },
+    android: {
+      priority: 'high',
+      notification: {
+        channelId: 'hatchtech_alerts',
+        sound: 'default',
+      },
+    },
+    data: { type: 'sensor_alert' },
+    tokens: tokens,
+  };
+
+  // Send notification using modern SDK method
+  try {
+    const response = await admin.messaging().sendEachForMulticast(message);
+    logger.info(`✅ Sent ${response.successCount} notification(s) for ${incubatorName}`);
+  } catch (error) {
+    logger.error('❌ Error sending notification:', error);
+  }
+
+  return null;
+});

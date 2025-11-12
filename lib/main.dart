@@ -19,15 +19,21 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterL
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Make sure Firebase is initialized
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  await FcmLocalNotificationService.instance.showNotificationFromRemoteMessage(message);
 
+  // Extract data safely
+  final title = message.notification?.title ?? message.data['title'] ?? 'HatchTech Alert';
+  final body = message.notification?.body ?? message.data['body'] ?? 'Check your incubator';
+
+  // Show local notification
   const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-    'hatchtech_alerts',
+    'hatchtech_alerts', // Must match channel ID in your app
     'HatchTech Alerts',
     channelDescription: 'Sensor and batch notifications',
     importance: Importance.max,
     priority: Priority.high,
+    playSound: true,
     icon: '@mipmap/ic_launcher',
   );
 
@@ -35,13 +41,18 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 
   await flutterLocalNotificationsPlugin.show(
     DateTime.now().millisecondsSinceEpoch ~/ 1000,
-    message.notification?.title ?? 'HatchTech Alert',
-    message.notification?.body ?? 'Check your incubator',
+    title,
+    body,
     platformDetails,
+    payload: message.data['payload'] ?? '', // Optional for tapping behavior
   );
 
-  print('Background/terminated notification handled: ${message.messageId}');
+  // Optional: handle custom logic in your FcmLocalNotificationService
+  await FcmLocalNotificationService.instance.showNotificationFromRemoteMessage(message);
+
+  print('📩 Background/terminated notification handled: ${message.messageId}');
 }
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,6 +63,19 @@ void main() async {
   const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
   const initSettings = InitializationSettings(android: androidInit);
   await flutterLocalNotificationsPlugin.initialize(initSettings);
+
+  // Create the Android Notification Channel
+  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+    'hatchtech_alerts', // ID from your background handler
+    'HatchTech Alerts', // name
+    description: 'Sensor and batch notifications for HatchTech.', // description
+    importance: Importance.max,
+    playSound: true,
+  );
+
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(channel);
 
   await NotificationManager.instance.init();
   await RealtimeNotificationService.instance.init();
