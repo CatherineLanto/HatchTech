@@ -833,8 +833,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                                 child: StreamBuilder<bool>(
                                   stream: statusService.onlineStatusStream,
                                   builder: (context, snapshot) {
-                                    final bool isOnline = snapshot.data ?? false;
-                                    final Color statusColor = isOnline ? Colors.green : Colors.red;
+                                    //final bool isOnline = snapshot.data ?? false;
+                                    final Color statusColor = Colors.green;
 
                                     return Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -876,8 +876,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
                               return StreamBuilder<bool>(
                                 stream: statusService.onlineStatusStream,
                                 builder: (context, snapshot) {
-                                  final bool isOnline = snapshot.data ?? false;
-                                  final Color statusColor = isOnline ? Colors.green : Colors.red;
+                                  //final bool isOnline = snapshot.data ?? false;
+                                  final Color statusColor = Colors.green;
 
                                   return Row(
                                     children: [
