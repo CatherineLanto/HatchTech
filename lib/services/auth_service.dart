@@ -121,7 +121,7 @@ class AuthService {
         'role': role,
         'created_at': FieldValue.serverTimestamp(),
         'last_login': FieldValue.serverTimestamp(),
-        'fcmTokens': [], // initialize
+        'fcmTokens': <String, dynamic>{},
       });
 
       await userCredential.user!.updateDisplayName(username);
@@ -257,25 +257,42 @@ class AuthService {
     }
   }
 
-  // ✅ Get user data
   static Future<Map<String, dynamic>?> getUserData() async {
-    if (currentUser == null) return null;
-    try {
-      final doc = await _firestore.collection('users').doc(currentUser!.uid).get();
-      return doc.data();
-    } catch (e) {
-      return null;
-    }
-  }
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
 
-  // ✅ Stream user data
-  static Stream<Map<String, dynamic>?> getUserDataStream() {
-    if (currentUser == null) return Stream.value(null);
-    return _firestore
+    final docSnapshot = await FirebaseFirestore.instance
         .collection('users')
-        .doc(currentUser!.uid)
+        .doc(user.uid)
+        .get();
+
+    // THIS IS THE LINE THAT PREVENTS THE CRASH
+    if (!docSnapshot.exists) {
+      // If the Firestore document is missing, clear the Auth session and return null.
+      await FirebaseAuth.instance.signOut(); 
+      return null; 
+    }
+
+    return docSnapshot.data();
+  }
+  
+  // You might also have a stream version:
+  static Stream<Map<String, dynamic>?> getUserDataStream() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return Stream.value(null);
+
+    return FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
         .snapshots()
-        .map((doc) => doc.exists ? doc.data() : null);
+        .map((snapshot) {
+            // Check for existence on every snapshot event
+            if (!snapshot.exists) {
+                // Cannot sign out in a stream map, but at least we return null safely
+                return null;
+            }
+            return snapshot.data();
+        });
   }
 
   // ✅ Update username

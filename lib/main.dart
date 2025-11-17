@@ -5,11 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_database/firebase_database.dart';
 import 'firebase_options.dart';
 import 'auth_wrapper.dart';
-import 'services/auth_service.dart';
 import 'services/notification_service.dart';
 import 'services/realtime_notification_service.dart'; 
 import 'package:hatchtech/services/notification_manager.dart';
@@ -90,7 +87,7 @@ void main() async {
 
   final fcmToken = await FirebaseMessaging.instance.getToken();
   print('📱 FCM Token: $fcmToken');
-
+/*
   try {
     final user = AuthService.currentUser;
     if (user != null && fcmToken != null) {
@@ -100,6 +97,7 @@ void main() async {
   } catch (e) {
     print('⚠️ Error saving FCM token: $e');
   }
+*/
 
   runApp(const HatchTechApp());
 }

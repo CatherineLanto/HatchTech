@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'login_screen.dart';
 import 'main_navigation.dart';
-import 'services/auth_service.dart';
+import 'services/fcm_service.dart';
 
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   final ValueNotifier<ThemeMode> themeNotifier;
 
   const AuthWrapper({super.key, required this.themeNotifier});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  String? _currentUserId;
 
   @override
   Widget build(BuildContext context) {
@@ -15,38 +24,49 @@ class AuthWrapper extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(
-              child: CircularProgressIndicator(),
-            ),
-          );
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
         }
-        
-        // If user is logged in
-        if (snapshot.hasData) {
-          return StreamBuilder<Map<String, dynamic>?>(
-            stream: AuthService.getUserDataStream(),
-            builder: (context, userDataSnapshot) {
-              if (userDataSnapshot.connectionState == ConnectionState.waiting) {
-                return const Scaffold(
-                  body: Center(
-                    child: CircularProgressIndicator(),
-                  ),
-                );
+
+        final user = snapshot.data;
+
+        if (user != null) {
+          _handleUserLogin(user);
+
+          return StreamBuilder<DocumentSnapshot>(
+            stream: FirebaseFirestore.instance
+                .collection('users')
+                .doc(user.uid)
+                .snapshots(),
+            builder: (context, userSnapshot) {
+              if (!userSnapshot.hasData) {
+                return const Scaffold(body: Center(child: CircularProgressIndicator()));
               }
-              
-              final username = userDataSnapshot.data?['username'] ?? 'User';
+
+              final userData = userSnapshot.data!.data() as Map?;
+              final username = userData?['username'] ?? 'User';
+
+              final incubators = userData?['incubators'] ?? [];
+              final bool hasIncubators = incubators.isNotEmpty;
+
               return MainNavigation(
                 userName: username,
-                themeNotifier: themeNotifier,
+                themeNotifier: widget.themeNotifier,
+                hasIncubators: hasIncubators,
               );
             },
           );
         }
-        
-        // If user is not logged in
-        return LoginScreen(themeNotifier: themeNotifier);
+
+        _currentUserId = null;
+        return LoginScreen(themeNotifier: widget.themeNotifier);
       },
     );
+  }
+
+  void _handleUserLogin(User user) {
+    if (_currentUserId != user.uid) {
+      _currentUserId = user.uid;
+      FcmService.updateTokenForCurrentUser(user);
+    }
   }
 }

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:hatchtech/services/auth_service.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:firebase_database/firebase_database.dart'; 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'overview_screen.dart';
 import 'dashboard.dart';
 import 'analytics_screen.dart';
@@ -10,11 +12,13 @@ import 'maintenance_log.dart';
 class MainNavigation extends StatefulWidget {
   final String userName;
   final ValueNotifier<ThemeMode> themeNotifier;
+  final bool hasIncubators;
 
   const MainNavigation({
-    super.key,
+    super.key, 
     required this.userName,
     required this.themeNotifier,
+    required this.hasIncubators,
   });
 
   @override
@@ -29,19 +33,63 @@ class _MainNavigationState extends State<MainNavigation> {
   Map<String, Map<String, dynamic>> sharedIncubatorData = {};
   Map<String, Map<String, dynamic>> scheduledCandlingData = {};
   List<Map<String, dynamic>> batchHistory = [];
+  bool get hasIncubators => sharedIncubatorData.isNotEmpty;
 
   @override
   void initState() {
     super.initState();
     currentUserName = widget.userName;
-    _loadUserRole();
+    _loadUserRole().then((_) {
+      _loadIncubatorData(); 
+    });
   }
 
   Future<void> _loadUserRole() async {
     final userData = await AuthService.getUserData();
     if (mounted) {
       setState(() {
-        userRole = userData?['role'] ?? '';
+        userRole = userData?['role'] ?? 'user';
+      });
+    }
+  }
+
+  // 👇 ADD THIS FUNCTION TO FILTER INCUBATORS BY USER ID
+  Future<void> _loadIncubatorData() async {
+    final uid = AuthService.currentUser?.uid;
+    if (uid == null) return;
+
+    // 1. Fetch the list of incubator IDs assigned to the user from Realtime DB
+    // Assumes the structure HatchTech/users/{uid}/incubators holds the assigned names.
+    final userIncubatorSnap = await FirebaseDatabase.instance
+        .ref("HatchTech/users/$uid/incubators")
+        .get();
+
+    Set<String> assignedIncubatorNames = {};
+    if (userIncubatorSnap.exists && userIncubatorSnap.value is Map) {
+      // The keys are the assigned incubator names
+      assignedIncubatorNames = (userIncubatorSnap.value as Map).keys.cast<String>().toSet();
+    }
+    
+    // 2. Fetch the details for the assigned incubators from Firestore
+    Map<String, Map<String, dynamic>> filteredData = {};
+    if (assignedIncubatorNames.isNotEmpty) {
+      // Fetch details for each assigned incubator from the 'incubators' Firestore collection
+      for (final name in assignedIncubatorNames) {
+        final incubatorDoc = await FirebaseFirestore.instance.collection('incubators').doc(name).get();
+        if (incubatorDoc.exists) {
+          filteredData[name] = incubatorDoc.data()!;
+        }
+      }
+    }
+
+    if (mounted) {
+      setState(() {
+        sharedIncubatorData = filteredData;
+        if (selectedIncubatorName.isEmpty && filteredData.isNotEmpty) {
+          selectedIncubatorName = filteredData.keys.first;
+        } else if (filteredData.isEmpty) {
+          selectedIncubatorName = '';
+        }
       });
     }
   }
@@ -122,50 +170,61 @@ class _MainNavigationState extends State<MainNavigation> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-          OverviewPage(
-            key: ValueKey('overview_$currentUserName'), 
-            userName: currentUserName,
-            themeNotifier: widget.themeNotifier,
-            sharedIncubatorData: sharedIncubatorData.isNotEmpty ? sharedIncubatorData : null,
-            batchHistory: batchHistory,
-            onDataChanged: _updateSharedData,
-            onUserNameChanged: _updateUserName,
-            onNavigateToDashboard: _navigateToDashboard,
-            onNavigateToAnalytics: _navigateToAnalytics,
-            userRole: userRole,
-            onNavigateToMaintenance: () {
-              setState(() {
-                _currentIndex = 3; 
-              });
-            },
-          ),
-          Dashboard(
-            key: ValueKey('dashboard_${currentUserName}_$selectedIncubatorName'),
-            incubatorName: selectedIncubatorName.isNotEmpty
-                ? selectedIncubatorName
-                : (sharedIncubatorData.isNotEmpty ? sharedIncubatorData.keys.first : 'Incubator 1'),
-            userName: currentUserName,
-            themeNotifier: widget.themeNotifier,
-            incubatorData: sharedIncubatorData.isNotEmpty ? sharedIncubatorData : null,
-            scheduledCandlingData: scheduledCandlingData,
-            onDataChanged: _updateSharedData,
-            onUserNameChanged: _updateUserName,
-            onScheduleChanged: _updateScheduledCandling,
-            onBatchHistoryChanged: _updateBatchHistory,
-            userRole: userRole,
-          ),
-          AnalyticsScreen(
-            key: ValueKey('analytics_$currentUserName'),
-            userName: currentUserName,
-            themeNotifier: widget.themeNotifier,
-            onNavigateToDashboard: _navigateToDashboard,
-            onCandlingScheduled: _updateScheduledCandling,
-            onDeleteBatch: _deleteBatchFromHistory,
-            onBatchHistoryChanged: _refreshBatchHistory,
-            userRole: userRole,
-          ),
-          MaintenanceLogPage(incubatorId: 'selectedIncubatorName', themeNotifier: widget.themeNotifier, userName: currentUserName,),
-        ],
+  OverviewPage(
+    key: ValueKey('overview_$currentUserName'),
+    userName: currentUserName,
+    themeNotifier: widget.themeNotifier,
+    sharedIncubatorData: sharedIncubatorData,
+    batchHistory: batchHistory,
+    onDataChanged: _updateSharedData,
+    onUserNameChanged: _updateUserName,
+    onNavigateToDashboard: _navigateToDashboard,
+    onNavigateToAnalytics: _navigateToAnalytics,
+    userRole: userRole,
+    hasIncubators: widget.hasIncubators, 
+    onNavigateToMaintenance: () {
+      setState(() {
+        _currentIndex = 3;
+      });
+    },
+  ),
+
+  Dashboard(
+    key: ValueKey('dashboard_${currentUserName}_$selectedIncubatorName'),
+    incubatorName: selectedIncubatorName.isNotEmpty
+        ? selectedIncubatorName
+        : (sharedIncubatorData.isNotEmpty ? sharedIncubatorData.keys.first : 'Incubator 1'),
+    userName: currentUserName,
+    themeNotifier: widget.themeNotifier,
+    incubatorData: sharedIncubatorData,
+    scheduledCandlingData: scheduledCandlingData,
+    onDataChanged: _updateSharedData,
+    onUserNameChanged: _updateUserName,
+    onScheduleChanged: _updateScheduledCandling,
+    onBatchHistoryChanged: _updateBatchHistory,
+    userRole: userRole,
+    hasIncubators: hasIncubators,
+  ),
+
+  AnalyticsScreen(
+    key: ValueKey('analytics_$currentUserName'),
+    userName: currentUserName,
+    themeNotifier: widget.themeNotifier,
+    onNavigateToDashboard: _navigateToDashboard,
+    onCandlingScheduled: _updateScheduledCandling,
+    onDeleteBatch: _deleteBatchFromHistory,
+    onBatchHistoryChanged: _refreshBatchHistory,
+    userRole: userRole,
+    hasIncubators: widget.hasIncubators,
+  ),
+
+  MaintenanceLogPage(
+    incubatorId: 'selectedIncubatorName',
+    themeNotifier: widget.themeNotifier,
+    userName: currentUserName,
+    hasIncubators: widget.hasIncubators,
+  ),
+],
       ),
 
       bottomNavigationBar: BottomNavigationBar(

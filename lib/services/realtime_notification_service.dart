@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class RealtimeNotificationService {
   RealtimeNotificationService._();
@@ -72,6 +73,10 @@ class RealtimeNotificationService {
 
   void startListening() {
     final ref = FirebaseDatabase.instance.ref('HatchTech');
+    if (FirebaseAuth.instance.currentUser == null) {
+        print('Skipping Realtime DB notification: User not logged in.');
+        return; 
+      }
 
     ref.onValue.listen((DatabaseEvent event) {
       final data = event.snapshot.value as Map?;
@@ -207,9 +212,17 @@ class RealtimeNotificationService {
   }
 
   void startBatchReminderListener() {
+    if (FirebaseAuth.instance.currentUser == null) {
+        print('Skipping Batch Reminder listener: User not logged in.');
+        return; 
+    }
     final firestore = FirebaseFirestore.instance.collection('batchHistory');
 
     firestore.where('isDone', isEqualTo: false).snapshots().listen((snapshot) {
+      if (FirebaseAuth.instance.currentUser == null) {
+        print('Skipping Batch Reminder notification: User logged out.');
+        return;
+      }
       final now = DateTime.now();
 
       for (var doc in snapshot.docs) {

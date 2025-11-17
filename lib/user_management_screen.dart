@@ -3,7 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'services/auth_service.dart';
 
 class UserManagementScreen extends StatelessWidget {
-  const UserManagementScreen({super.key});
+  final String ownerUid;
+  const UserManagementScreen({super.key, required this.ownerUid});
 
   void _showEditUserDialog(BuildContext context, String userId, Map<String, dynamic> user) {
   final usernameController = TextEditingController(text: user['username'] ?? '');
@@ -59,6 +60,7 @@ class UserManagementScreen extends StatelessWidget {
                 });
                 // Only update email if changed
                 if (newEmail != (user['email'] ?? '')) {
+                  // Assuming AuthService.updateUserEmail is defined elsewhere
                   final result = await AuthService.updateUserEmail(userId: userId, newEmail: newEmail);
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['message']), backgroundColor: result['success'] ? Colors.green : Colors.red));
                 } else {
@@ -76,50 +78,135 @@ class UserManagementScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = AuthService.currentUser?.uid;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('User Management'),
         backgroundColor: Colors.blueAccent,
         foregroundColor: Colors.white,
       ),
-      body: FutureBuilder<QuerySnapshot>(
-        future: FirebaseFirestore.instance.collection('users').get(),
+      // FutureBuilder to fetch *only* users invited by the owner
+      body: FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        // Only queries for users whose 'invitedByUid' matches the current owner's UID
+        future: FirebaseFirestore.instance.collection('users')
+          .where('invitedByUid', isEqualTo: ownerUid) 
+          .get(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text('No users found.'));
+          if (snapshot.hasError) {
+             return Center(child: Text('Error loading users: ${snapshot.error}'));
           }
-          final users = snapshot.data!.docs;
-          return ListView.builder(
-            itemCount: users.length,
-            itemBuilder: (context, index) {
-              final user = users[index].data() as Map<String, dynamic>;
-              final userId = users[index].id;
-              return Card(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: ListTile(
-                  leading: const Icon(Icons.person),
-                  title: Text(user['username'] ?? 'Unknown'),
-                  subtitle: Text(user['email'] ?? ''),
-                  trailing: PopupMenuButton<String>(
-                    onSelected: (value) async {
-                      if (value == 'edit') {
-                        _showEditUserDialog(context, userId, user);
-                      } else if (value == 'remove') {
-                        await FirebaseFirestore.instance.collection('users').doc(userId).delete();
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User removed.')));
-                      }
-                    },
-                    itemBuilder: (context) => [
-                      const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                      const PopupMenuItem(value: 'remove', child: Text('Remove')),
-                    ],
-                  ),
-                ),
-              );
-            },
+          
+          // Nested FutureBuilder to explicitly fetch the owner's data
+          return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+             future: FirebaseFirestore.instance.collection('users').doc(ownerUid).get(),
+             builder: (context, ownerSnapshot) {
+               
+               // Combine the owner's data with the invited users data
+               List<Map<String, dynamic>> usersList = [];
+               
+               // Add owner/admin user first
+               if (ownerSnapshot.hasData && ownerSnapshot.data!.exists) {
+                 final ownerData = ownerSnapshot.data!.data()!;
+                 usersList.add({
+                   ...ownerData,
+                   'id': ownerSnapshot.data!.id,
+                   'isOwner': true,
+                 });
+               }
+
+               // Add all invited users
+               if (snapshot.hasData) {
+                 for (var doc in snapshot.data!.docs) {
+                   if (doc.id != ownerUid) { // Avoid duplicates
+                     usersList.add({
+                       ...doc.data(),
+                       'id': doc.id,
+                       'isOwner': false,
+                     });
+                   }
+                 }
+               }
+               
+               if (usersList.isEmpty) {
+                 return const Center(child: Text('No users connected yet.'));
+               }
+
+               // Sort to ensure the owner is always at the top
+               usersList.sort((a, b) {
+                  if (a['id'] == ownerUid) return -1;
+                  if (b['id'] == ownerUid) return 1;
+                  return (a['username'] ?? '').compareTo(b['username'] ?? '');
+               });
+               
+               return ListView.builder(
+                 itemCount: usersList.length,
+                 itemBuilder: (context, index) {
+                   final user = usersList[index];
+                   final userId = user['id'] as String;
+                   final isCurrentUser = userId == currentUserId;
+                   final userRole = (user['role'] ?? 'user').toString();
+                   final isOwner = user['id'] == ownerUid;
+
+                   return Card(
+                     margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                     child: ListTile(
+                       leading: const Icon(Icons.person),
+                       title: Text(
+                         user['username'] ?? 'Unknown',
+                         style: TextStyle(fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.normal),
+                       ),
+                       subtitle: Text(
+                         // Display role nicely
+                         '${user['email'] ?? 'No Email'} - ${userRole[0].toUpperCase()}${userRole.substring(1)}',
+                       ),
+                       trailing: isCurrentUser
+                           ? const Text('You', style: TextStyle(color: Colors.blueAccent, fontWeight: FontWeight.bold))
+                           : PopupMenuButton<String>(
+                               onSelected: (value) async {
+                                 if (value == 'edit') {
+                                   _showEditUserDialog(context, userId, user);
+                                 } else if (value == 'remove') {
+                                   // Confirmation dialog before removing
+                                   final confirmed = await showDialog<bool>(
+                                     context: context,
+                                     builder: (ctx) => AlertDialog(
+                                       title: const Text('Remove User?'),
+                                       content: Text('Are you sure you want to remove ${user['username']} from your team?'),
+                                       actions: [
+                                         TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                                         ElevatedButton(
+                                            onPressed: () => Navigator.pop(ctx, true), 
+                                            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                                            child: const Text('Remove', style: TextStyle(color: Colors.white))
+                                         ),
+                                       ],
+                                     ),
+                                   ) ?? false;
+
+                                   if (confirmed) {
+                                     await FirebaseFirestore.instance.collection('users').doc(userId).delete();
+                                     if (context.mounted) {
+                                       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('User removed.')));
+                                     }
+                                   }
+                                 }
+                               },
+                               // Only allow actions on non-owner and non-current users
+                               itemBuilder: (context) => [
+                                 const PopupMenuItem(value: 'edit', child: Text('Edit Role')),
+                                 if (!isOwner) // Owner/Admin cannot be removed from this list
+                                    const PopupMenuItem(value: 'remove', child: Text('Remove User', style: TextStyle(color: Colors.red))),
+                               ],
+                             ),
+                     ),
+                   );
+                 },
+               );
+             },
           );
         },
       ),

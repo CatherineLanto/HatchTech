@@ -136,45 +136,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
+@override
+Widget build(BuildContext context) {
   bool isDark = widget.themeNotifier.value == ThemeMode.dark;
   final roleLower = (userRole ?? '').toLowerCase();
   bool isOwnerOrAdmin = roleLower.contains('owner') || roleLower.contains('admin');
   bool isManager = roleLower.contains('manager');
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        backgroundColor: Colors.blueAccent,
-        foregroundColor: Colors.white,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () async {
-            await _saveUserData();
-            Navigator.pop(context, _nameController.text.trim());
+  // Safely get the current user's ID
+  final currentUserId = AuthService.currentUser?.uid;
+
+  return Scaffold(
+    // ... (AppBar and other top sections remain the same)
+    appBar: AppBar(
+      title: const Text('Profile'),
+      backgroundColor: Colors.blueAccent,
+      foregroundColor: Colors.white,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () async {
+          await _saveUserData();
+          Navigator.pop(context, _nameController.text.trim());
+        },
+      ),
+      actions: [
+        IconButton(
+          icon: Icon(
+            isDark ? Icons.dark_mode : Icons.light_mode,
+            color: Colors.white,
+          ),
+          onPressed: () {
+            widget.themeNotifier.value =
+                isDark ? ThemeMode.light : ThemeMode.dark;
           },
         ),
-        actions: [
-          IconButton(
-            icon: Icon(
-              isDark ? Icons.dark_mode : Icons.light_mode,
-              color: Colors.white,
-            ),
-            onPressed: () {
-              widget.themeNotifier.value =
-                  isDark ? ThemeMode.light : ThemeMode.dark;
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            // Invite code generator for owner/admin (no role selection, above log out)
-            ...[],
-            Stack(
+      ],
+    ),
+    body: SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          // ... (Avatar and Username editing sections remain the same)
+          Stack(
               alignment: Alignment.center,
               children: [
                 CircleAvatar(
@@ -338,7 +341,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   ),
                   const Divider(height: 0),
-                  if (isOwnerOrAdmin) ...[
+                  if (isOwnerOrAdmin && currentUserId != null) ...[
                     ListTile(
                       leading: Icon(Icons.group,
                           color: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent),
@@ -352,14 +355,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                           builder: (_) => SizedBox(
                             height: MediaQuery.of(context).size.height * 0.85,
-                            child: const UserManagementScreen(),
+                            // *** CHANGE: Pass the current user's ID for filtering ***
+                            child: UserManagementScreen(ownerUid: currentUserId),
                           ),
                         );
                       },
                     ),
                     const Divider(height: 0),
                   ],
-                  if (isOwnerOrAdmin || isManager)
+                  if ((isOwnerOrAdmin || isManager) && widget.incubatorData.isNotEmpty)
                     ListTile(
                       leading: Icon(Icons.devices,
                           color: isDark ? const Color(0xFF6BB6FF) : Colors.blueAccent),
@@ -387,7 +391,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-
             const SizedBox(height: 10),
             if (isOwnerOrAdmin) ...[
               SizedBox(
@@ -440,7 +443,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
       ),
     );
-  }
+}
+
 }
 
 class IncubatorManager extends StatelessWidget {
@@ -455,6 +459,8 @@ class IncubatorManager extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final incubatorNames = incubatorData.keys.toList(); // Use a list for reliable count
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 40),
       child: Column(
@@ -467,44 +473,55 @@ class IncubatorManager extends StatelessWidget {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 20),
-          ListView.separated(
-            shrinkWrap: true,
-            itemCount: incubatorData.keys.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (_, index) {
-              final name = incubatorData.keys.elementAt(index);
-              return ListTile(
-                title: Text(name),
-                trailing: const Icon(Icons.delete_outline,
-                    size: 20, color: Colors.blueAccent),
-                onTap: () {
-                  showDialog(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: Text('Delete "$name"?'),
-                      content: const Text(
-                          'Are you sure you want to remove this incubator?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('Cancel'),
+          // Handle the empty state clearly
+          if (incubatorNames.isEmpty)
+            const Text(
+              'No incubators currently assigned for management.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontStyle: FontStyle.italic),
+            )
+          else
+            // Wrap ListView.separated in Expanded since the parent SizedBox is constrained
+            Expanded(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: incubatorNames.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (_, index) {
+                  final name = incubatorNames.elementAt(index);
+                  return ListTile(
+                    title: Text(name),
+                    trailing: const Icon(Icons.delete_outline,
+                        size: 20, color: Colors.blueAccent),
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: Text('Delete "$name"?'),
+                          content: const Text(
+                              'Are you sure you want to remove this incubator?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Cancel'),
+                            ),
+                            ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: Colors.blueAccent),
+                              onPressed: () {
+                                onDelete(name);
+                                Navigator.pop(ctx);
+                              },
+                              child: const Text('Delete'),
+                            ),
+                          ],
                         ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blueAccent),
-                          onPressed: () {
-                            onDelete(name);
-                            Navigator.pop(ctx);
-                          },
-                          child: const Text('Delete'),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   );
                 },
-              );
-            },
-          ),
+              ),
+            ),
         ],
       ),
     );
