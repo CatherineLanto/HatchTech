@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:hatchtech/services/auth_service.dart';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:firebase_database/firebase_database.dart'; 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'overview_screen.dart';
 import 'dashboard.dart';
@@ -53,27 +52,25 @@ class _MainNavigationState extends State<MainNavigation> {
     }
   }
 
-  // 👇 ADD THIS FUNCTION TO FILTER INCUBATORS BY USER ID
   Future<void> _loadIncubatorData() async {
     final uid = AuthService.currentUser?.uid;
     if (uid == null) return;
 
-    // 1. Fetch the list of incubator IDs assigned to the user from Realtime DB
-    // Assumes the structure HatchTech/users/{uid}/incubators holds the assigned names.
-    final userIncubatorSnap = await FirebaseDatabase.instance
-        .ref("HatchTech/users/$uid/incubators")
+    final userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(uid)
         .get();
 
-    Set<String> assignedIncubatorNames = {};
-    if (userIncubatorSnap.exists && userIncubatorSnap.value is Map) {
-      // The keys are the assigned incubator names
-      assignedIncubatorNames = (userIncubatorSnap.value as Map).keys.cast<String>().toSet();
+    List<String> assignedIncubatorNames = [];
+    if (userDoc.exists) {
+      final incubators = userDoc.data()?['incubators'];
+      if (incubators is List) {
+        assignedIncubatorNames = incubators.map((e) => e.toString()).toList();
+      }
     }
-    
-    // 2. Fetch the details for the assigned incubators from Firestore
+
     Map<String, Map<String, dynamic>> filteredData = {};
     if (assignedIncubatorNames.isNotEmpty) {
-      // Fetch details for each assigned incubator from the 'incubators' Firestore collection
       for (final name in assignedIncubatorNames) {
         final incubatorDoc = await FirebaseFirestore.instance.collection('incubators').doc(name).get();
         if (incubatorDoc.exists) {
@@ -203,7 +200,7 @@ class _MainNavigationState extends State<MainNavigation> {
     onScheduleChanged: _updateScheduledCandling,
     onBatchHistoryChanged: _updateBatchHistory,
     userRole: userRole,
-    hasIncubators: hasIncubators,
+    hasIncubators: widget.hasIncubators,
   ),
 
   AnalyticsScreen(
@@ -223,6 +220,7 @@ class _MainNavigationState extends State<MainNavigation> {
     themeNotifier: widget.themeNotifier,
     userName: currentUserName,
     hasIncubators: widget.hasIncubators,
+    onUserNameChanged: _updateUserName
   ),
 ],
       ),

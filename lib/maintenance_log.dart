@@ -36,20 +36,25 @@ class _MaintenanceLogPageState extends State<MaintenanceLogPage> {
 
   void loadLogs() async {
     final ref = FirebaseDatabase.instance
-        .ref("HatchTech/${widget.incubatorId}/maintenance/history");
+        .ref("HatchTech/${widget.incubatorId}/maintenance");
     final snapshot = await ref.get();
     if (snapshot.exists) {
-      final Map data = Map<String, dynamic>.from(snapshot.value as Map);
-      final List<Map<String, dynamic>> sortedLogs = data.entries.map((e) {
-        final log = Map<String, dynamic>.from(e.value);
-        log['timestamp'] = e.key;
-        return log;
-      }).toList()
-        ..sort((a, b) => b['timestamp'].compareTo(a['timestamp']));
+  final Map<String, dynamic> data = Map<String, dynamic>.from(snapshot.value as Map);
 
-      setState(() => logs = sortedLogs);
-      cleanupOldLogs(ref, sortedLogs);
-    }
+  final List<Map<String, dynamic>> sortedLogs = data.entries.map((e) {
+    final log = Map<String, dynamic>.from(e.value);
+    log['id'] = e.key; // store the push key if you need it
+    return log;
+  }).toList()
+    ..sort((a, b) {
+      // If you have a timestamp field inside the log, use it
+      final t1 = a['timestamp'] ?? '';
+      final t2 = b['timestamp'] ?? '';
+      return t2.toString().compareTo(t1.toString());
+    });
+
+  setState(() => logs = sortedLogs);
+}
   }
 
   void cleanupOldLogs(DatabaseReference ref, List<Map<String, dynamic>> logs) {
