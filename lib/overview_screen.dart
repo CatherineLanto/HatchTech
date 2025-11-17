@@ -131,21 +131,24 @@ class _OverviewPageState extends State<OverviewPage> {
   @override
   void didUpdateWidget(OverviewPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    
-    if (widget.sharedIncubatorData != oldWidget.sharedIncubatorData) {
+
+    if (widget.sharedIncubatorData != null &&
+        widget.sharedIncubatorData!.isNotEmpty &&
+        widget.sharedIncubatorData != oldWidget.sharedIncubatorData) {
       debugPrint('OverviewScreen: Shared incubator data updated');
-      if (widget.sharedIncubatorData != null && widget.sharedIncubatorData!.isNotEmpty) {
-        setState(() {
-          incubatorData = Map.from(widget.sharedIncubatorData!);
-          incubators = incubatorData.keys.toList();
-        });
-        _updateCounts();
-      }
+      setState(() {
+        incubatorData = Map.from(widget.sharedIncubatorData!);
+        incubators = incubatorData.keys.toList();
+      });
+      _updateCounts();
     }
   }
 
   Map<String, Map<String, dynamic>> get _currentIncubatorData {
-    return widget.sharedIncubatorData ?? incubatorData;
+    if (widget.sharedIncubatorData != null && widget.sharedIncubatorData!.isNotEmpty) {
+      return widget.sharedIncubatorData!;
+    }
+    return incubatorData;
   }
   
   get selectedIncubator => null;
@@ -287,456 +290,443 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
   @override
-Widget build(BuildContext context) {
-  final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+  Widget build(BuildContext context) {
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-  // 1. Define the AppBar once (it is always visible)
-  final overviewAppBar = AppBar(
-    title: const Text("Overview"),
-    backgroundColor: Colors.blueAccent,
-    foregroundColor: Colors.white,
-    actions: [
-      IconButton(
-        icon: const Icon(Icons.person),
-        onPressed: () async {
-          await showModalBottomSheet(
-            context: context,
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            builder: (context) => DraggableScrollableSheet(
-              initialChildSize: 0.9,
-              minChildSize: 0.5,
-              maxChildSize: 0.95,
-              builder: (context, scrollController) => Container(
-                decoration: BoxDecoration(
-                  color: Theme.of(context).scaffoldBackgroundColor,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                // Assuming ProfileScreen is imported and its required variables are in scope
-                child: ProfileScreen(
-                  incubatorData: incubatorData,
-                  selectedIncubator:
-                      incubators.isNotEmpty ? incubators.first : '',
-                  themeNotifier: widget.themeNotifier,
-                  userName: userName,
-                  onUserNameChanged: () async {
-                    final userData = await AuthService.getUserData();
-                    if (mounted && userData != null) {
-                      setState(() {
-                        userName = userData['username'] ?? userName;
-                      });
-                      widget.onUserNameChanged?.call(userName);
-                    }
-                  },
+    final overviewAppBar = AppBar(
+      title: const Text("Overview"),
+      backgroundColor: Colors.blueAccent,
+      foregroundColor: Colors.white,
+      actions: [
+          IconButton(
+          icon: const Icon(Icons.person),
+          onPressed: () async {
+            await showModalBottomSheet(
+              context: context,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (context) => DraggableScrollableSheet(
+                initialChildSize: 0.9,
+                minChildSize: 0.5,
+                maxChildSize: 0.95,
+                builder: (context, scrollController) => Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
+                  child: ProfileScreen(
+                    incubatorData: incubatorData,
+                    selectedIncubator:
+                        incubators.isNotEmpty ? incubators.first : '',
+                    themeNotifier: widget.themeNotifier,
+                    userName: userName,
+                    onUserNameChanged: () async {
+                      final userData = await AuthService.getUserData();
+                      if (mounted && userData != null) {
+                        setState(() {
+                          userName = userData['username'] ?? userName;
+                        });
+                        widget.onUserNameChanged?.call(userName);
+                      }
+                    },
+                  ),
                 ),
               ),
-            ),
-          );
+            );
 
-          if (mounted) {
-            setState(() {
-              // Assuming these variables and methods are defined in your _OverviewPageState
-              incubators = List<String>.from(incubatorData.keys);
-              _updateCounts(); 
-            });
-          }
-        },
-      ),
-    ],
-  );
+            if (mounted) {
+              setState(() {
+                incubators = List<String>.from(incubatorData.keys);
+                _updateCounts(); 
+              });
+            }
+          },
+        ),
+      ],
+    );
 
-  // 2. Define the body content conditionally
-  final Widget bodyContent = widget.hasIncubators
-      ? ListView(
-          // This is your original full ListView body
-          padding: const EdgeInsets.all(16.0),
-          children: [
-            // Assuming 'isNewUser' is a state variable.
-            Text(
-              isNewUser ? "Welcome, $userName!" : "Welcome back, $userName!",
-              style: Theme.of(context)
-                  .textTheme
-                  .headlineSmall
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
+    final Widget bodyContent = widget.hasIncubators
+        ? ListView(
+            padding: const EdgeInsets.all(16.0),
+            children: [
+              Text(
+                isNewUser ? "Welcome, $userName!" : "Welcome back, $userName!",
+                style: Theme.of(context)
+                    .textTheme
+                    .headlineSmall
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
 
-            // Assuming _buildAnalyticsSummaryCard is a method in the State class.
-            _buildAnalyticsSummaryCard(isDarkMode),
-            const SizedBox(height: 20),
+              _buildAnalyticsSummaryCard(isDarkMode),
+              const SizedBox(height: 20),
 
-            Text(
-              "System Overview",
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 15),
+              Text(
+                "System Overview",
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 15),
 
-            if (normalIncubators.isNotEmpty) ...[
-              // ... (Stable Incubators Card logic)
-              Card(
-                color: isDarkMode ? const Color(0xFF1B4332) : Colors.green.shade100,
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.verified,
-                            color: isDarkMode ? const Color(0xFF40C057) : Colors.green.shade700,
-                            size: 32,
-                          ),
-                          const SizedBox(width: 12),
-                          Text(
-                            "Stable Incubators",
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 18,
+              if (normalIncubators.isNotEmpty) ...[
+                Card(
+                  color: isDarkMode ? const Color(0xFF1B4332) : Colors.green.shade100,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.verified,
                               color: isDarkMode ? const Color(0xFF40C057) : Colors.green.shade700,
+                              size: 32,
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      // Assuming normalCount is a state variable
-                      Text(
-                        "$normalCount incubator(s) operating within optimal parameters", 
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                      const SizedBox(height: 12),
-                      const Divider(),
-                      const SizedBox(height: 8),
-                      ...normalIncubators.asMap().entries.map((entry) {
-                        final index = entry.key;
-                        final name = entry.value;
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4.0),
-                          child: AnimatedContainer(
-                            duration: Duration(milliseconds: 300 + (index * 100)),
-                            curve: Curves.easeOutBack,
-                            child: GestureDetector(
-                              onTap: () {
-                                if (widget.onNavigateToDashboard != null) {
-                                  widget.onNavigateToDashboard!(name);
-                                }
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.all(12.0),
-                                decoration: BoxDecoration(
-                                  color: isDarkMode ? const Color(0xFF1B4332) : Colors.green.shade50,
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
-                                    color: isDarkMode ? const Color(0xFF40C057) : Colors.green.shade200,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Icon(
-                                      Icons.check_circle_outline,
-                                      color: isDarkMode ? const Color(0xFF40C057) : Colors.green,
-                                      size: 20,
+                            const SizedBox(width: 12),
+                            Text(
+                              "Stable Incubators",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                                color: isDarkMode ? const Color(0xFF40C057) : Colors.green.shade700,
+                              ),
+                              ),
+                          ],
+                        ),
+                          const SizedBox(height: 12),
+                        Text(
+                          "$normalCount incubator(s) operating within optimal parameters", 
+                          style: const TextStyle(fontSize: 14),
+                        ),
+                        const SizedBox(height: 12),
+                        const Divider(),
+                        const SizedBox(height: 8),
+                        ...normalIncubators.asMap().entries.map((entry) {
+                          final index = entry.key;
+                          final name = entry.value;
+                            return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4.0),
+                            child: AnimatedContainer(
+                              duration: Duration(milliseconds: 300 + (index * 100)),
+                              curve: Curves.easeOutBack,
+                              child: GestureDetector(
+                                onTap: () {
+                                  if (widget.onNavigateToDashboard != null) {
+                                    widget.onNavigateToDashboard!(name);
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.all(12.0),
+                                  decoration: BoxDecoration(
+                                    color: isDarkMode ? const Color(0xFF1B4332) : Colors.green.shade50,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isDarkMode ? const Color(0xFF40C057) : Colors.green.shade200,
+                                      width: 1,
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle_outline,
+                                        color: isDarkMode ? const Color(0xFF40C057) : Colors.green,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              name,
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                color: isDarkMode ? const Color(0xFF40C057) : Colors.green.shade700,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                            Text(
+                                              _getBatchSummary(name),
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: isDarkMode ? const Color(0xFF51CF66) : Colors.green.shade600,
+                                                fontStyle: FontStyle.italic,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
                                         children: [
                                           Text(
-                                            name,
+                                            "All systems normal",
                                             style: TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              color: isDarkMode ? const Color(0xFF40C057) : Colors.green.shade700,
-                                              fontSize: 15,
-                                            ),
-                                          ),
-                                          Text(
-                                            _getBatchSummary(name),
-                                            style: TextStyle(
-                                              fontSize: 11,
+                                              fontSize: 12,
                                               color: isDarkMode ? const Color(0xFF51CF66) : Colors.green.shade600,
                                               fontStyle: FontStyle.italic,
                                             ),
                                           ),
+                                          Text(
+                                            _getDaysRemaining(name),
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: isDarkMode ? const Color(0xFF69DB7C) : Colors.green.shade500,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
                                         ],
                                       ),
-                                    ),
-                                    Column(
-                                      crossAxisAlignment: CrossAxisAlignment.end,
+                                      const SizedBox(width: 8),
+                                      Icon(
+                                        Icons.arrow_forward_ios,
+                                        color: isDarkMode ? const Color(0xFF69DB7C) : Colors.green.shade400,
+                                        size: 16,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+
+              if (warningIncubators.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Row(
+                  children: const [
+                    Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                    SizedBox(width: 6),
+                    Text(
+                      "Warnings",
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.orange,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                ...warningIncubators.map((incubator) => GestureDetector(
+                    onTap: () {
+                      if (widget.onNavigateToDashboard != null) {
+                        widget.onNavigateToDashboard!(incubator);
+                      }
+                    },
+                    child: Card(
+                      color: isDarkMode ? const Color(0xFF2D1B0F) : Colors.orange.shade100,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(12.0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                    Row(
                                       children: [
-                                        Text(
-                                          "All systems normal",
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: isDarkMode ? const Color(0xFF51CF66) : Colors.green.shade600,
-                                            fontStyle: FontStyle.italic,
+                                        Expanded(
+                                          child: Text(
+                                            incubator,
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold),
                                           ),
                                         ),
                                         Text(
-                                          _getDaysRemaining(name),
+                                          _getDaysRemaining(incubator),
                                           style: TextStyle(
-                                            fontSize: 10,
-                                            color: isDarkMode ? const Color(0xFF69DB7C) : Colors.green.shade500,
+                                              fontSize: 10,
+                                            color: isDarkMode ? const Color(0xFFFF8C42) : Colors.orange.shade600,
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(width: 8),
-                                    Icon(
-                                      Icons.arrow_forward_ios,
-                                      color: isDarkMode ? const Color(0xFF69DB7C) : Colors.green.shade400,
-                                      size: 16,
+                                    Text(
+                                      _getBatchSummary(incubator),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDarkMode ? const Color(0xFFFFB347) : Colors.orange.shade700,
+                                        fontStyle: FontStyle.italic,
+                                      ),
                                     ),
-                                  ],
-                                ),
-                              ),
+                                    const SizedBox(height: 6),
+                                    ...warningDetails[incubator]!.map((issue) =>
+                                        Text("- $issue",
+                                            style: const TextStyle(fontSize: 13))),
+                                  ]),
                             ),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+                            Column(
+                              children: [
+                                Icon(Icons.error, color: isDarkMode ? const Color(0xFFFF5252) : Colors.red),
+                                const SizedBox(height: 4),
+                                Icon(
+                                  Icons.arrow_forward_ios,
+                                  color: isDarkMode ? const Color(0xFFFF8C42) : Colors.orange.shade400,
+                                  size: 16,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  )),
+              ],
 
-            if (warningIncubators.isNotEmpty) ...[
               const SizedBox(height: 20),
-              Row(
-                children: const [
-                  Icon(Icons.warning_amber_rounded, color: Colors.orange),
-                  SizedBox(width: 6),
-                  Text(
-                    "Warnings",
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.orange,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              // Assuming warningIncubators, _getDaysRemaining, _getBatchSummary, warningDetails are in scope
-              ...warningIncubators.map((incubator) => GestureDetector(
-                  onTap: () {
-                    if (widget.onNavigateToDashboard != null) {
-                      widget.onNavigateToDashboard!(incubator);
-                    }
-                  },
-                  child: Card(
-                    color: isDarkMode ? const Color(0xFF2D1B0F) : Colors.orange.shade100,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12.0),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: Text(
-                                          incubator,
-                                          style: const TextStyle(
-                                              fontWeight: FontWeight.bold),
-                                        ),
-                                      ),
-                                      Text(
-                                        _getDaysRemaining(incubator),
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: isDarkMode ? const Color(0xFFFF8C42) : Colors.orange.shade600,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  Text(
-                                    _getBatchSummary(incubator),
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: isDarkMode ? const Color(0xFFFFB347) : Colors.orange.shade700,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  // Assuming warningDetails is a Map<String, List<String>>
-                                  ...warningDetails[incubator]!.map((issue) =>
-                                      Text("- $issue",
-                                          style: const TextStyle(fontSize: 13))),
-                                ]),
-                          ),
-                          Column(
-                            children: [
-                              Icon(Icons.error, color: isDarkMode ? const Color(0xFFFF5252) : Colors.red),
-                              const SizedBox(height: 4),
-                              Icon(
-                                Icons.arrow_forward_ios,
-                                color: isDarkMode ? const Color(0xFFFF8C42) : Colors.orange.shade400,
-                                size: 16,
+              GestureDetector(
+                onTap: () {
+                  widget.onNavigateToMaintenance?.call();
+                },
+                child: Card(
+                  elevation: 2,
+                  color: isDarkMode ? const Color(0xFF0F1B2D) : const Color(0xFFE3F2FD),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.build_circle_rounded, color: Colors.blueAccent, size: 28),
+                            SizedBox(width: 10),
+                            Text(
+                              "Maintenance",
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.blueAccent,
+                                fontWeight: FontWeight.bold,
                               ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                )),
-            ],
-
-            const SizedBox(height: 20),
-            GestureDetector(
-              onTap: () {
-                widget.onNavigateToMaintenance?.call();
-              },
-              child: Card(
-                elevation: 2,
-                color: isDarkMode ? const Color(0xFF0F1B2D) : const Color(0xFFE3F2FD),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: const [
-                          Icon(Icons.build_circle_rounded, color: Colors.blueAccent, size: 28),
-                          SizedBox(width: 10),
-                          Text(
-                            "Maintenance",
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.blueAccent,
-                              fontWeight: FontWeight.bold,
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 10),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
 
-                      FutureBuilder<Map<String, dynamic>>(
-                        future: FirebaseDatabase.instance
-                            .ref("HatchTech/Maintenance")
-                            .get()
-                            .then((snapshot) => (snapshot.value ?? {}) as Map<String, dynamic>),
-                            builder: (context, snapshot) {
-                            if (snapshot.connectionState == ConnectionState.waiting) {
-                              return const Center(child: CircularProgressIndicator());
-                            } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                              return const Text(
-                                "No recent maintenance records found.",
-                                style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
-                              );
-                            }
+                        FutureBuilder<Map<String, dynamic>>(
+                          future: FirebaseDatabase.instance
+                              .ref("HatchTech/Maintenance")
+                              .get()
+                              .then((snapshot) => (snapshot.value ?? {}) as Map<String, dynamic>),
+                              builder: (context, snapshot) {
+                              if (snapshot.connectionState == ConnectionState.waiting) {
+                                return const Center(child: CircularProgressIndicator());
+                              } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                                return const Text(
+                                  "No recent maintenance records found.",
+                                  style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
+                                );
+                              }
 
-                            final maintenanceRecords = snapshot.data!;
-                            final entries = maintenanceRecords.entries.toList()
-                              ..sort((a, b) => b.value['timestamp'].compareTo(a.value['timestamp']));
-                            final latestRecords = entries.take(3).toList();
+                              final maintenanceRecords = snapshot.data!;
+                              final entries = maintenanceRecords.entries.toList()
+                                ..sort((a, b) => b.value['timestamp'].compareTo(a.value['timestamp']));
+                              final latestRecords = entries.take(3).toList();
 
-                          return Column(
-                            children: latestRecords.map((entry) {
-                              final data = entry.value;
-                              final date = DateTime.fromMillisecondsSinceEpoch(data['timestamp']);
-                              final formattedDate =
-                                "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
+                            return Column(
+                              children: latestRecords.map((entry) {
+                                final data = entry.value;
+                                final date = DateTime.fromMillisecondsSinceEpoch(data['timestamp']);
+                                final formattedDate =
+                                  "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
 
-                              return Card(
-                                color: isDarkMode ? const Color(0xFF0F1B2D) : Colors.blue.shade50,
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                child: ListTile(
-                                  leading: const Icon(Icons.settings, color: Colors.blueAccent),
-                                  title: Text(
-                                    data['task'] ?? 'Maintenance Task',
-                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                return Card(
+                                  color: isDarkMode ? const Color(0xFF0F1B2D) : Colors.blue.shade50,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  child: ListTile(
+                                    leading: const Icon(Icons.settings, color: Colors.blueAccent),
+                                    title: Text(
+                                      data['task'] ?? 'Maintenance Task',
+                                      style: const TextStyle(fontWeight: FontWeight.bold),
+                                    ),
+                                    subtitle: Text("Date: $formattedDate\nBy: ${data['performedBy'] ?? 'N/A'}"),
                                   ),
-                                  subtitle: Text("Date: $formattedDate\nBy: ${data['performedBy'] ?? 'N/A'}"),
-                                ),
-                              );
-                            }).toList(),
-                          );
-                        },
-                      ),
-                    ],
+                                );
+                              }).toList(),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
+
+              if (normalIncubators.isEmpty && warningIncubators.isEmpty) ...[
+                const SizedBox(height: 20),
+                Card(
+                  color: isDarkMode ? const Color(0xFF0F1B2D) : Colors.blue.shade50,
+                  elevation: 2,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      children: [
+                        Icon(
+                          Icons.sensors,
+                          color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue.shade600,
+                          size: 48,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          "System Monitoring",
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18,
+                            color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue.shade700,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "All incubators are being monitored. Status updates will appear here when conditions change.",
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: isDarkMode ? const Color(0xFF9FC5FF) : Colors.blue.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          )
+        : Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: const [
+                Icon(Icons.egg_alt_outlined, size: 50, color: Colors.grey),
+                SizedBox(height: 16),
+                Text(
+                  "Add an incubator to get an overview.",
+                  style: TextStyle(fontSize: 16),
+                ),
+              ],
             ),
+          );
 
-            if (normalIncubators.isEmpty && warningIncubators.isEmpty) ...[
-              const SizedBox(height: 20),
-              Card(
-                color: isDarkMode ? const Color(0xFF0F1B2D) : Colors.blue.shade50,
-                elevation: 2,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.sensors,
-                        color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue.shade600,
-                        size: 48,
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        "System Monitoring",
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                          color: isDarkMode ? const Color(0xFF6BB6FF) : Colors.blue.shade700,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        "All incubators are being monitored. Status updates will appear here when conditions change.",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: isDarkMode ? const Color(0xFF9FC5FF) : Colors.blue.shade600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ],
-        )
-      : Center(
-          // This is the empty state content
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Icon(Icons.egg_alt_outlined, size: 50, color: Colors.grey),
-              SizedBox(height: 16),
-              Text(
-                "Add an incubator to get an overview.",
-                style: TextStyle(fontSize: 16),
-              ),
-            ],
-          ),
-        );
-
-  // 3. Return the single Scaffold with the permanent AppBar and conditional body
-  return Scaffold(
-    backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-    appBar: overviewAppBar,
-    body: bodyContent,
-  );
-}
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: overviewAppBar,
+      body: bodyContent,
+    );
+  }
 
   Widget _buildAnalyticsSummaryCard(bool isDarkMode) {
     final dataSource = widget.sharedIncubatorData ?? incubatorData;
@@ -818,7 +808,7 @@ Widget build(BuildContext context) {
                 Expanded(
                   child: _buildQuickStat(
                     'Active Batches',
-                    '${dataSource.length}',
+                    '2',
                     Icons.egg,
                     Colors.orange,
                     isDarkMode,
@@ -889,7 +879,7 @@ Widget build(BuildContext context) {
   Widget buildMaintenanceSection() {
     return StreamBuilder(
       stream: FirebaseDatabase.instance
-          .ref("HatchTech/$selectedIncubator/maintenance/active")
+          .ref("HatchTech/$selectedIncubator/maintenance")
           .onValue,
       builder: (context, snapshot) {
         final rawValue = snapshot.data!.snapshot.value;
@@ -931,5 +921,4 @@ Widget build(BuildContext context) {
           },
     );
   }
-
 }

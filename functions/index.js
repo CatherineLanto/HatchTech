@@ -91,18 +91,23 @@ try {
   logger.info(`✅ Sent ${response.successCount} notification(s) for ${incubatorName}`);
   
   if (response.failureCount > 0) {
-    const failedTokens = [];
-    response.responses.forEach((resp, index) => {
-      if (!resp.success) {
-        failedTokens.push({
-          token: tokens[index],
-          error: resp.error.code,
-          message: resp.error.message,
-        });
+  response.responses.forEach((resp, idx) => {
+    if (!resp.success) {
+      const failedToken = tokens[idx];
+      if (resp.error.code === 'messaging/registration-token-not-registered') {
+        firestore.collection('users').where('fcmTokens', 'array-contains', failedToken)
+          .get()
+          .then(snapshot => {
+            snapshot.forEach(doc => {
+              doc.ref.update({
+                fcmTokens: admin.firestore.FieldValue.arrayRemove(failedToken)
+              });
+            });
+          });
       }
-    });
-    logger.error(`❌ Failed to send to ${response.failureCount} device(s):`, JSON.stringify(failedTokens, null, 2));
-  }
+    }
+  });
+}
 
 } catch (error) {
   logger.error('❌ FATAL Error sending notification:', error);

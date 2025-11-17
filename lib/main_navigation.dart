@@ -1,3 +1,5 @@
+// ignore_for_file: avoid_print
+
 import 'package:flutter/material.dart';
 import 'package:hatchtech/services/auth_service.dart';
 import 'dart:convert';
@@ -7,6 +9,7 @@ import 'overview_screen.dart';
 import 'dashboard.dart';
 import 'analytics_screen.dart';
 import 'maintenance_log.dart';
+import 'dart:async';
 
 class MainNavigation extends StatefulWidget {
   final String userName;
@@ -14,7 +17,7 @@ class MainNavigation extends StatefulWidget {
   final bool hasIncubators;
 
   const MainNavigation({
-    super.key, 
+    super.key,
     required this.userName,
     required this.themeNotifier,
     required this.hasIncubators,
@@ -34,13 +37,21 @@ class _MainNavigationState extends State<MainNavigation> {
   List<Map<String, dynamic>> batchHistory = [];
   bool get hasIncubators => sharedIncubatorData.isNotEmpty;
 
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userSubscription;
+
   @override
   void initState() {
     super.initState();
     currentUserName = widget.userName;
     _loadUserRole().then((_) {
-      _loadIncubatorData(); 
+      _setupIncubatorDataStream();
     });
+  }
+
+  @override
+  void dispose() {
+    _userSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadUserRole() async {
@@ -52,40 +63,54 @@ class _MainNavigationState extends State<MainNavigation> {
     }
   }
 
-  Future<void> _loadIncubatorData() async {
+  void _setupIncubatorDataStream() {
     final uid = AuthService.currentUser?.uid;
     if (uid == null) return;
 
-    final userDoc = await FirebaseFirestore.instance
+    _userSubscription = FirebaseFirestore.instance
         .collection('users')
         .doc(uid)
-        .get();
-
-    List<String> assignedIncubatorNames = [];
-    if (userDoc.exists) {
-      final incubators = userDoc.data()?['incubators'];
-      if (incubators is List) {
-        assignedIncubatorNames = incubators.map((e) => e.toString()).toList();
+        .snapshots()
+        .listen((userDoc) {
+      if (userDoc.exists) {
+        _fetchIncubatorsBasedOnUserDoc(userDoc);
+      } else {
+        if (mounted) {
+          setState(() {
+            sharedIncubatorData = {};
+            selectedIncubatorName = '';
+          });
+        }
       }
+    });
+  }
+
+  Future<void> _fetchIncubatorsBasedOnUserDoc(DocumentSnapshot userDoc) async {
+    final incubatorsList = userDoc.data()?['incubators'];
+    List<String> assignedIncubatorNames = [];
+
+    if (incubatorsList is List) {
+      assignedIncubatorNames = incubatorsList.map((e) => e.toString()).toList();
     }
 
     Map<String, Map<String, dynamic>> filteredData = {};
     if (assignedIncubatorNames.isNotEmpty) {
-      for (final name in assignedIncubatorNames) {
+      await Future.wait(assignedIncubatorNames.map((name) async {
         final incubatorDoc = await FirebaseFirestore.instance.collection('incubators').doc(name).get();
         if (incubatorDoc.exists) {
           filteredData[name] = incubatorDoc.data()!;
         }
-      }
+      }));
     }
 
     if (mounted) {
       setState(() {
         sharedIncubatorData = filteredData;
+        
         if (selectedIncubatorName.isEmpty && filteredData.isNotEmpty) {
           selectedIncubatorName = filteredData.keys.first;
-        } else if (filteredData.isEmpty) {
-          selectedIncubatorName = '';
+        } else if (!filteredData.containsKey(selectedIncubatorName)) {
+          selectedIncubatorName = filteredData.keys.firstOrNull ?? '';
         }
       });
     }
@@ -167,62 +192,62 @@ class _MainNavigationState extends State<MainNavigation> {
       body: IndexedStack(
         index: _currentIndex,
         children: [
-  OverviewPage(
-    key: ValueKey('overview_$currentUserName'),
-    userName: currentUserName,
-    themeNotifier: widget.themeNotifier,
-    sharedIncubatorData: sharedIncubatorData,
-    batchHistory: batchHistory,
-    onDataChanged: _updateSharedData,
-    onUserNameChanged: _updateUserName,
-    onNavigateToDashboard: _navigateToDashboard,
-    onNavigateToAnalytics: _navigateToAnalytics,
-    userRole: userRole,
-    hasIncubators: widget.hasIncubators, 
-    onNavigateToMaintenance: () {
-      setState(() {
-        _currentIndex = 3;
-      });
-    },
-  ),
+          OverviewPage(
+            key: ValueKey('overview_$currentUserName'),
+            userName: currentUserName,
+            themeNotifier: widget.themeNotifier,
+            sharedIncubatorData: sharedIncubatorData,
+            batchHistory: batchHistory,
+            onDataChanged: _updateSharedData,
+            onUserNameChanged: _updateUserName,
+            onNavigateToDashboard: _navigateToDashboard,
+            onNavigateToAnalytics: _navigateToAnalytics,
+            userRole: userRole,
+            hasIncubators: widget.hasIncubators, 
+            onNavigateToMaintenance: () {
+              setState(() {
+                _currentIndex = 3;
+              });
+            },
+          ),
 
-  Dashboard(
-    key: ValueKey('dashboard_${currentUserName}_$selectedIncubatorName'),
-    incubatorName: selectedIncubatorName.isNotEmpty
-        ? selectedIncubatorName
-        : (sharedIncubatorData.isNotEmpty ? sharedIncubatorData.keys.first : 'Incubator 1'),
-    userName: currentUserName,
-    themeNotifier: widget.themeNotifier,
-    incubatorData: sharedIncubatorData,
-    scheduledCandlingData: scheduledCandlingData,
-    onDataChanged: _updateSharedData,
-    onUserNameChanged: _updateUserName,
-    onScheduleChanged: _updateScheduledCandling,
-    onBatchHistoryChanged: _updateBatchHistory,
-    userRole: userRole,
-    hasIncubators: widget.hasIncubators,
-  ),
+          Dashboard(
+            key: ValueKey('dashboard_${currentUserName}_$selectedIncubatorName'),
+            incubatorName: selectedIncubatorName.isNotEmpty
+                ? selectedIncubatorName
+                : (sharedIncubatorData.isNotEmpty ? sharedIncubatorData.keys.first : 'Incubator 1'),
+            userName: currentUserName,
+            themeNotifier: widget.themeNotifier,
+            incubatorData: sharedIncubatorData,
+            scheduledCandlingData: scheduledCandlingData,
+            onDataChanged: _updateSharedData,
+            onUserNameChanged: _updateUserName,
+            onScheduleChanged: _updateScheduledCandling,
+            onBatchHistoryChanged: _updateBatchHistory,
+            userRole: userRole,
+            hasIncubators: widget.hasIncubators,
+          ),
 
-  AnalyticsScreen(
-    key: ValueKey('analytics_$currentUserName'),
-    userName: currentUserName,
-    themeNotifier: widget.themeNotifier,
-    onNavigateToDashboard: _navigateToDashboard,
-    onCandlingScheduled: _updateScheduledCandling,
-    onDeleteBatch: _deleteBatchFromHistory,
-    onBatchHistoryChanged: _refreshBatchHistory,
-    userRole: userRole,
-    hasIncubators: widget.hasIncubators,
-  ),
+          AnalyticsScreen(
+            key: ValueKey('analytics_$currentUserName'),
+            userName: currentUserName,
+            themeNotifier: widget.themeNotifier,
+            onNavigateToDashboard: _navigateToDashboard,
+            onCandlingScheduled: _updateScheduledCandling,
+            onDeleteBatch: _deleteBatchFromHistory,
+            onBatchHistoryChanged: _refreshBatchHistory,
+            userRole: userRole,
+            hasIncubators: widget.hasIncubators,
+          ),
 
-  MaintenanceLogPage(
-    incubatorId: 'selectedIncubatorName',
-    themeNotifier: widget.themeNotifier,
-    userName: currentUserName,
-    hasIncubators: widget.hasIncubators,
-    onUserNameChanged: _updateUserName
-  ),
-],
+          MaintenanceLogPage(
+            incubatorId: 'selectedIncubatorName',
+            themeNotifier: widget.themeNotifier,
+            userName: currentUserName,
+            hasIncubators: widget.hasIncubators,
+            onUserNameChanged: _updateUserName
+          ),
+        ],
       ),
 
       bottomNavigationBar: BottomNavigationBar(
@@ -261,4 +286,8 @@ class _MainNavigationState extends State<MainNavigation> {
       ),
     );
   }
+}
+
+extension on Object? {
+  operator [](String other) {}
 }

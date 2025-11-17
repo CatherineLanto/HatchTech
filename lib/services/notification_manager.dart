@@ -52,34 +52,31 @@ class NotificationManager {
     _initialized = true;
   }
 
- Future<void> _saveUserFcmToken() async {
-  final user = FirebaseAuth.instance.currentUser;
-  if (user == null) return;
+  Future<void> _saveUserFcmToken() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
 
-  final token = await _messaging.getToken();
-  if (token == null) return;
+    final token = await _messaging.getToken();
+    if (token == null) return;
 
-  // 👇 FIX APPLIED HERE: Use set(data, SetOptions(merge: true))
-  // This creates the document if it's missing, preventing the "not-found" error.
-  await _firestore.collection('users').doc(user.uid).set(
-    {
-      'fcm_token': token,
-      'last_token_update': FieldValue.serverTimestamp(),
-    },
-    SetOptions(merge: true), 
-  );
-
-  _messaging.onTokenRefresh.listen((newToken) async {
-    // 👇 FIX APPLIED HERE for token refresh
     await _firestore.collection('users').doc(user.uid).set(
       {
-        'fcm_token': newToken,
+          'fcm_token': token,
         'last_token_update': FieldValue.serverTimestamp(),
       },
-      SetOptions(merge: true),
+      SetOptions(merge: true), 
     );
-  });
-}
+
+    _messaging.onTokenRefresh.listen((newToken) async {
+      await _firestore.collection('users').doc(user.uid).set(
+        {
+          'fcm_token': newToken,
+          'last_token_update': FieldValue.serverTimestamp(),
+        },
+        SetOptions(merge: true),
+      );
+    });
+  }
 
   void _listenRealtime() {
     _rtdb.onValue.listen((event) {

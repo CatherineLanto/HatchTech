@@ -93,7 +93,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
               });
             }
 
-            // Update Firestore incubator document with new sensor data using normalized booleans.
             await FirebaseFirestore.instance.collection('incubators').doc(incubatorId).update({
               'temperature': sensorData['temperature'] ?? 0.0,
               'humidity': sensorData['humidity'] ?? 0.0,
@@ -109,6 +108,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       }
     });
   }
+
   void listenToIncubatorData() {
     FirebaseFirestore.instance.collection('incubators').snapshots().listen((snapshot) {
       final Map<String, Map<String, dynamic>> fetchedData = {};
@@ -138,13 +138,12 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
 
   void showAddIncubatorDialog(BuildContext context) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
-
-  final TextEditingController nameController = TextEditingController();
-  final TextEditingController batchController = TextEditingController();
-  final TextEditingController eggCountController = TextEditingController(text: '12');
-  final TextEditingController breedController = TextEditingController();
-  final TextEditingController daysController = TextEditingController(text: '21');
-  final TextEditingController sensorIdController = TextEditingController();
+    final TextEditingController nameController = TextEditingController();
+    final TextEditingController batchController = TextEditingController();
+    final TextEditingController eggCountController = TextEditingController(text: '12');
+    final TextEditingController breedController = TextEditingController();
+    final TextEditingController daysController = TextEditingController(text: '21');
+    final TextEditingController sensorIdController = TextEditingController();
 
     showDialog(
       context: context,
@@ -339,6 +338,7 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       ),
     );
   }
+
   String selectedIncubator = 'Incubator 1';
   bool showWarning = false;
   List<Map<String, dynamic>> currentAlerts = [];
@@ -351,12 +351,8 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   late String currentUserName;
   late AnimationController _warningAnimationController;
   late Animation<double> _warningAnimation;
-
   Map<String, Map<String, dynamic>> incubatorData = {};
-
-  // Track pending toggle writes to avoid duplicate concurrent operations
   final Map<String, bool> _togglePending = {};
-
   List<Map<String, dynamic>> batchHistory = []; 
 
   @override
@@ -477,13 +473,11 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
     _togglePending[key] = true;
 
     try {
-    // mark pending and rebuild so UI disables the switch and shows spinner
     setState(() {
       _togglePending[key] = true;
       incubatorData[selectedIncubator]?[firestoreKey] = value;
     });
-
-      // Update Firestore (UI/source of truth)
+      // Update Firestore
       try {
         await FirebaseFirestore.instance.collection('incubators').doc(selectedIncubator).update({
           firestoreKey: value,
@@ -497,7 +491,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
         }
       }
 
-      // Write to Realtime Database for Arduino (1/0)
       try {
         final sensorId = incubatorData[selectedIncubator]?['sensorId'] as String?;
         if (sensorId != null && sensorId.isNotEmpty) {
@@ -532,7 +525,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
       );
       }
     } finally {
-    // clear pending and rebuild UI so switch re-enables
     if (mounted) {
       setState(() {
         _togglePending[key] = false;
@@ -551,7 +543,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
 
     try {
       final collection = FirebaseFirestore.instance.collection('batchHistory');
-      // Avoid duplicate entries: check for existing entries with same batchName, startDate and incubatorName
       final batchName = historyEntry['batchName'];
       final startDate = historyEntry['startDate'];
       if (batchName != null && startDate != null) {
@@ -568,7 +559,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
 
       await collection.add(historyEntry);
     } catch (e) {
-      // ignore or log
       debugPrint('Error adding batch history: $e');
     }
   }
@@ -640,7 +630,6 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
             onPressed: () async {
               String newName = controller.text.trim();
               if (newName.isNotEmpty && !incubatorData.containsKey(newName)) {
-                // Copy incubator data to new document in Firestore
                 final incubatorInfo = Map<String, dynamic>.from(incubatorData[incubatorKey]!);
                 await FirebaseFirestore.instance.collection('incubators').doc(newName).set(incubatorInfo);
                 await FirebaseFirestore.instance.collection('incubators').doc(incubatorKey).delete();
@@ -675,312 +664,303 @@ class _DashboardState extends State<Dashboard> with TickerProviderStateMixin {
   }
 
   @override
-Widget build(BuildContext context) {
-  // Define a local function for the common modal logic to reduce code duplication
-  Future<void> showProfileModal({required bool notifyOnChange}) async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) => Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: ProfileScreen(
-            incubatorData: incubatorData,
-            selectedIncubator: selectedIncubator,
-            themeNotifier: widget.themeNotifier,
-            userName: currentUserName,
-            onUserNameChanged: () async {
-              final user = AuthService.currentUser;
-              if (user != null) {
-                // Logic from the original main dashboard block
-                final newUserName = user.displayName ?? 'User';
-                setState(() {
-                  currentUserName = newUserName;
-                });
-                widget.onUserNameChanged?.call(newUserName);
-              }
-            },
+  Widget build(BuildContext context) {
+    Future<void> showProfileModal({required bool notifyOnChange}) async {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => DraggableScrollableSheet(
+          initialChildSize: 0.9,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (context, scrollController) => Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: ProfileScreen(
+              incubatorData: incubatorData,
+              selectedIncubator: selectedIncubator,
+              themeNotifier: widget.themeNotifier,
+              userName: currentUserName,
+              onUserNameChanged: () async {
+                final user = AuthService.currentUser;
+                if (user != null) {
+                  final newUserName = user.displayName ?? 'User';
+                  setState(() {
+                    currentUserName = newUserName;
+                  });
+                  widget.onUserNameChanged?.call(newUserName);
+                }
+              },
+            ),
           ),
         ),
-      ),
-    );
+      );
 
-    if (notifyOnChange) {
-      // Post-dismiss logic to refresh state (executed only on the main dashboard)
-      setState(() {
-        if (!incubatorData.containsKey(selectedIncubator) && incubatorData.isNotEmpty) {
-          selectedIncubator = incubatorData.keys.first;
+      if (notifyOnChange) {
+        setState(() {
+          if (!incubatorData.containsKey(selectedIncubator) && incubatorData.isNotEmpty) {
+            selectedIncubator = incubatorData.keys.first;
+          }
+          checkAlerts();
+        });
+
+        if (widget.onDataChanged != null) {
+          widget.onDataChanged!(Map.from(incubatorData));
         }
-        checkAlerts();
-      });
-
-      if (widget.onDataChanged != null) {
-        widget.onDataChanged!(Map.from(incubatorData));
       }
     }
-  }
-  
-  // Handle selected incubator fallback if it became invalid.
-  if (!incubatorData.containsKey(selectedIncubator)) {
-    if (incubatorData.isNotEmpty) {
-      selectedIncubator = incubatorData.keys.first;
-    }
-  }
 
-  // Unified empty state screen: Checks if there are no incubators at all (or if data is empty).
-  // The logic for the original !widget.hasIncubators is merged here for a consistent UX.
-  if (!widget.hasIncubators || incubatorData.isEmpty) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Dashboard'),
-        backgroundColor: Colors.blueAccent,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () => showProfileModal(notifyOnChange: false),
+    if (!incubatorData.containsKey(selectedIncubator)) {
+      if (incubatorData.isNotEmpty) {
+        selectedIncubator = incubatorData.keys.first;
+      }
+    }
+
+    if (!widget.hasIncubators || incubatorData.isEmpty) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Dashboard'),
+          backgroundColor: Colors.blueAccent,
+          foregroundColor: Colors.white,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.person),
+              onPressed: () => showProfileModal(notifyOnChange: false),
+            ),
+          ],
+        ),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('No incubators found. Please add one to get started.'),
+              const SizedBox(height: 20),
+              if (isOwnerOrAdmin)
+                ElevatedButton.icon(
+                  onPressed: () => showAddIncubatorDialog(context),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Incubator'),
+                ),
+            ],
           ),
-        ],
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        ),
+      );
+    }
+
+    final selected = incubatorData[selectedIncubator]!;
+
+    return PopScope(
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          _notifyDataChanged();
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Dashboard'),
+          backgroundColor: Colors.blueAccent,
+          foregroundColor: Colors.white,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.person),
+              onPressed: () => showProfileModal(notifyOnChange: true), 
+            ),
+          ],
+        ),
+        body: Stack(
           children: [
-            const Text('No incubators found. Please add one to get started.'),
-            const SizedBox(height: 20),
-            if (isOwnerOrAdmin)
-              ElevatedButton.icon(
-                onPressed: () => showAddIncubatorDialog(context),
-                icon: const Icon(Icons.add),
-                label: const Text('Add Incubator'),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Focus(
+                          focusNode: dropdownFocusNode,
+                          onFocusChange: (hasFocus) {
+                            setState(() {
+                              isDropdownOpen = hasFocus;
+                            });
+                          },
+                          child: DropdownButtonFormField<String>(
+                            value: selectedIncubator,
+                            items: incubatorData.keys.map((key) {
+                              final statusService = getStatusService(key);
+                              return DropdownMenuItem(
+                                value: key,
+                                child: StreamBuilder<bool>(
+                                  stream: statusService.onlineStatusStream,
+                                  builder: (context, snapshot) {
+                                    final Color statusColor = Colors.green;
+
+                                    return Row(
+                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      children: [
+                                        Container(
+                                          width: 10,
+                                          height: 10,
+                                          margin: const EdgeInsets.only(right: 8),
+                                          decoration: BoxDecoration(
+                                            color: statusColor,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        Text(key),
+                                        const Spacer(), 
+
+                                        if (isDropdownOpen && isOwnerOrAdmin)
+                                          IconButton(
+                                            icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
+                                            onPressed: () {
+                                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                                showRenameDialog(context, key);
+                                              });
+                                            },
+                                          ),
+                                      ],
+                                    );
+                                  },
+                                ),
+                              );
+                            }).toList(),
+
+                            selectedItemBuilder: (context) {
+                              return incubatorData.keys.map((key) {
+                                if (key != selectedIncubator) return const SizedBox.shrink();
+
+                                final statusService = getStatusService(key);
+
+                                return StreamBuilder<bool>(
+                                  stream: statusService.onlineStatusStream,
+                                  builder: (context, snapshot) {
+                                    final Color statusColor = Colors.green;
+
+                                    return Row(
+                                      children: [
+                                        Container(
+                                          width: 10,
+                                          height: 10,
+                                          margin: const EdgeInsets.only(right: 8),
+                                          decoration: BoxDecoration(
+                                            color: statusColor,
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                        Text(key),
+                                      ],
+                                    );
+                                  },
+                                );
+                              }).toList();
+                            },
+                            onChanged: (value) {
+                              if (value != null) {
+                                setState(() {
+                                  selectedIncubator = value;
+                                  showWarning = false;
+                                  checkAlerts();
+                                });
+                              }
+                            },
+                            decoration: const InputDecoration(
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      if (isOwnerOrAdmin)
+                        ElevatedButton.icon(
+                          onPressed: () => showAddIncubatorDialog(context),
+                          icon: const Icon(Icons.add),
+                          label: const Text("Add"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueAccent,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
+                          GridView.count(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 8,
+                            children: [
+                              buildSensorCard('Temperature', (selected['temperature'] as num?)?.toDouble() ?? 0.0, Icons.thermostat, max: 40),
+                              buildSensorCard('Humidity', (selected['humidity'] as num?)?.toDouble() ?? 0.0, Icons.water_drop, max: 100),
+                              buildSensorCard('Oxygen', (selected['oxygen'] as num?)?.toDouble() ?? 0.0, Icons.air, max: 25),
+                              buildSensorCard('CO₂', (selected['co2'] as num?)?.toDouble() ?? 0.0, Icons.cloud, max: 1200),
+                              buildToggleCard(
+                                'Egg Turning',
+                                selected['eggTurning'] ?? false,
+                                (val) {
+                                  _toggleAndSend(firestoreKey: 'eggTurning', realtimeKey: 'motor', value: val);
+                                },
+                                selectedIncubator,
+                                enabled: _togglePending['${selectedIncubator}_eggTurning'] != true,
+                              ),
+  
+                              buildToggleCard(
+                                'Lighting',
+                                selected['lighting'] ?? false,
+                                (val) {
+                                  _toggleAndSend(firestoreKey: 'lighting', realtimeKey: 'light', value: val);
+                                },
+                                selectedIncubator,
+                                enabled: _togglePending['${selectedIncubator}_lighting'] != true,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          buildBatchTrackingCard(selected),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: () => showStartNewBatchDialog(context),
+                              icon: const Icon(Icons.add),
+                              label: const Text('Start New Batch'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF4CAF50),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (showWarning)
+              Positioned(
+                top: 80,
+                left: 0,
+                right: 0,
+                child: buildWarningDialog(),
               ),
           ],
         ),
       ),
     );
   }
-
-  // We are now sure incubatorData is NOT empty and selectedIncubator is valid.
-  final selected = incubatorData[selectedIncubator]!;
-
-  return PopScope(
-    onPopInvokedWithResult: (didPop, result) {
-      if (didPop) {
-        _notifyDataChanged();
-      }
-    },
-    child: Scaffold(
-      appBar: AppBar(
-        title: const Text('Dashboard'),
-        backgroundColor: Colors.blueAccent,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person),
-            onPressed: () => showProfileModal(notifyOnChange: true), // Use extracted logic
-          ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Focus(
-                        focusNode: dropdownFocusNode,
-                        onFocusChange: (hasFocus) {
-                          setState(() {
-                            isDropdownOpen = hasFocus;
-                          });
-                        },
-                        child: DropdownButtonFormField<String>(
-                          value: selectedIncubator,
-                          items: incubatorData.keys.map((key) {
-                            final statusService = getStatusService(key);
-                            return DropdownMenuItem(
-                              value: key,
-                              child: StreamBuilder<bool>(
-                                stream: statusService.onlineStatusStream,
-                                builder: (context, snapshot) {
-                                  //final bool isOnline = snapshot.data ?? false;
-                                  final Color statusColor = Colors.green;
-
-                                  return Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Container(
-                                        width: 10,
-                                        height: 10,
-                                        margin: const EdgeInsets.only(right: 8),
-                                        decoration: BoxDecoration(
-                                          color: statusColor,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      Text(key),
-                                      const Spacer(), 
-                          
-                                      if (isDropdownOpen && isOwnerOrAdmin)
-                                        IconButton(
-                                          icon: const Icon(Icons.edit, size: 18, color: Colors.grey),
-                                          onPressed: () {
-                                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                                              showRenameDialog(context, key);
-                                            });
-                                          },
-                                        ),
-                                    ],
-                                  );
-                                },
-                              ),
-                            );
-                          }).toList(),
-
-                          selectedItemBuilder: (context) {
-                            return incubatorData.keys.map((key) {
-                              if (key != selectedIncubator) return const SizedBox.shrink();
-                  
-                              final statusService = getStatusService(key);
-
-                              return StreamBuilder<bool>(
-                                stream: statusService.onlineStatusStream,
-                                builder: (context, snapshot) {
-                                  //final bool isOnline = snapshot.data ?? false;
-                                  final Color statusColor = Colors.green;
-
-                                  return Row(
-                                    children: [
-                                      Container(
-                                        width: 10,
-                                        height: 10,
-                                        margin: const EdgeInsets.only(right: 8),
-                                        decoration: BoxDecoration(
-                                          color: statusColor,
-                                          shape: BoxShape.circle,
-                                        ),
-                                      ),
-                                      Text(key),
-                                    ],
-                                  );
-                                },
-                              );
-                            }).toList();
-                          },
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() {
-                                selectedIncubator = value;
-                                showWarning = false;
-                                checkAlerts();
-                              });
-                            }
-                          },
-                          decoration: const InputDecoration(
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    if (isOwnerOrAdmin)
-                      ElevatedButton.icon(
-                        onPressed: () => showAddIncubatorDialog(context),
-                        icon: const Icon(Icons.add),
-                        label: const Text("Add"),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      children: [
-                        GridView.count(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
-                          crossAxisSpacing: 12,
-                          mainAxisSpacing: 8,
-                          children: [
-                            buildSensorCard('Temperature', (selected['temperature'] as num?)?.toDouble() ?? 0.0, Icons.thermostat, max: 40),
-                            buildSensorCard('Humidity', (selected['humidity'] as num?)?.toDouble() ?? 0.0, Icons.water_drop, max: 100),
-                            buildSensorCard('Oxygen', (selected['oxygen'] as num?)?.toDouble() ?? 0.0, Icons.air, max: 25),
-                            buildSensorCard('CO₂', (selected['co2'] as num?)?.toDouble() ?? 0.0, Icons.cloud, max: 1200),
-                            buildToggleCard(
-                              'Egg Turning',
-                              selected['eggTurning'] ?? false,
-                              (val) {
-                                _toggleAndSend(firestoreKey: 'eggTurning', realtimeKey: 'motor', value: val);
-                              },
-                              selectedIncubator,
-                              enabled: _togglePending['${selectedIncubator}_eggTurning'] != true,
-                            ),
-
-                            buildToggleCard(
-                              'Lighting',
-                              selected['lighting'] ?? false,
-                              (val) {
-                                _toggleAndSend(firestoreKey: 'lighting', realtimeKey: 'light', value: val);
-                              },
-                              selectedIncubator,
-                              enabled: _togglePending['${selectedIncubator}_lighting'] != true,
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 10),
-                        buildBatchTrackingCard(selected),
-                        const SizedBox(height: 12),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton.icon(
-                            onPressed: () => showStartNewBatchDialog(context),
-                            icon: const Icon(Icons.add),
-                            label: const Text('Start New Batch'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF4CAF50),
-                              foregroundColor: Colors.white,
-                              padding: const EdgeInsets.symmetric(vertical: 12),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          if (showWarning)
-            Positioned(
-              top: 80,
-              left: 0,
-              right: 0,
-              child: buildWarningDialog(),
-            ),
-        ],
-      ),
-    ),
-  );
-}
 
   Widget buildSensorCard(String label, double value, IconData icon, {double max = 100}) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
@@ -1172,7 +1152,6 @@ Widget build(BuildContext context) {
       padding: const EdgeInsets.all(12),
       child: Stack(
         children: [
-          // --- Top-right kebab menu (only for Egg Turning) ---
           if (label == 'Egg Turning')
             Positioned(
               top: 0,
@@ -1191,11 +1170,9 @@ Widget build(BuildContext context) {
               ),
             ),
 
-          // --- Main card content ---
           Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // --- Icon and Kebab Menu ---
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -1218,7 +1195,6 @@ Widget build(BuildContext context) {
               ),
               const SizedBox(height: 10),
 
-              // --- Toggle Switch ---
               Stack(
                 alignment: Alignment.center,
                 children: [
@@ -1244,7 +1220,6 @@ Widget build(BuildContext context) {
                 ],
               ),
 
-              // --- Label ---
               AnimatedDefaultTextStyle(
                 duration: const Duration(milliseconds: 300),
                 style: Theme.of(context).textTheme.bodyMedium!.copyWith(
@@ -1263,7 +1238,6 @@ Widget build(BuildContext context) {
   Widget buildBatchTrackingCard(Map<String, dynamic> data) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
-    // Get batch info with default values if not present
     final String batchName = data['batchName'] ?? 'No batch';
     final int startDateMs = data['startDate'] ?? DateTime.now().millisecondsSinceEpoch;
     final int incubationDays = data['incubationDays'] ?? 21;
@@ -1312,7 +1286,6 @@ Widget build(BuildContext context) {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            // Icon
             TweenAnimationBuilder<Color?>(
               duration: const Duration(milliseconds: 500),
               tween: ColorTween(begin: Colors.grey, end: progressColor),
@@ -1321,7 +1294,6 @@ Widget build(BuildContext context) {
               },
             ),
             const SizedBox(width: 16),
-            // Batch Information
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1359,7 +1331,6 @@ Widget build(BuildContext context) {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  // Linear Progress Bar
                   TweenAnimationBuilder<double>(
                     duration: const Duration(milliseconds: 800),
                     tween: Tween(begin: 0.0, end: progress),
@@ -1623,7 +1594,6 @@ Widget build(BuildContext context) {
               final String newBreed = breedController.text.trim();
               
               if (newBatchName.isNotEmpty && newDays > 0 && newEggCount >= 0) {
-                // Update Firestore document
                 await FirebaseFirestore.instance
                   .collection('incubators')
                   .doc(selectedIncubator)
@@ -1787,7 +1757,6 @@ Widget build(BuildContext context) {
             onPressed: () {
               _addBatchToHistory(currentBatch, selectedIncubator, reason: 'Replaced');
               Navigator.pop(context);
-              // mark prevArchived=true to avoid duplicate history insertion inside the form
               showNewBatchFormDialog(context, prevArchived: true);
             },
             style: ElevatedButton.styleFrom(

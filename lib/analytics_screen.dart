@@ -110,17 +110,17 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.orange.withOpacity(0.1), // FIXED
+                        color: Colors.orange.withOpacity(0.1), 
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Icon( // Added const
+                      child: const Icon(
                         Icons.visibility,
                         color: Colors.orange,
                         size: 24,
                       ),
                     ),
                     const SizedBox(width: 12),
-                    const Expanded( // Added const
+                    const Expanded( 
                       child: Text(
                         'Schedule Candling',
                         style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
@@ -134,7 +134,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                const Text( // Added const
+                const Text( 
                   'Select Incubator for Candling:',
                   style: TextStyle(
                     fontSize: 16,
@@ -178,16 +178,16 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                             borderRadius: BorderRadius.circular(8),
                             side: BorderSide(
                               color: isScheduled 
-                                  ? Colors.green.withOpacity(0.3) // FIXED
-                                  : Colors.orange.withOpacity(0.3), // FIXED
+                                  ? Colors.green.withOpacity(0.3) 
+                                  : Colors.orange.withOpacity(0.3), 
                             ),
                           ),
                           leading: Container(
                             padding: const EdgeInsets.all(6),
                             decoration: BoxDecoration(
                               color: isScheduled
-                                  ? Colors.green.withOpacity(0.1) // FIXED
-                                  : Colors.orange.withOpacity(0.1), // FIXED
+                                  ? Colors.green.withOpacity(0.1) 
+                                  : Colors.orange.withOpacity(0.1), 
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Icon(
@@ -207,7 +207,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                               if (nextCandlingDay != null && !isScheduled)
                                 Text(
                                   'Next candling: Day $nextCandlingDay (${nextCandlingDay - daysElapsed} days)',
-                                  style: const TextStyle( // Added const
+                                  style: const TextStyle(
                                     fontSize: 11,
                                     color: Colors.orange,
                                     fontWeight: FontWeight.w500,
@@ -216,14 +216,14 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                               else if (isScheduled)
                                 Text(
                                   'Candling scheduled for Day $nextCandlingDay ✓',
-                                  style: const TextStyle( // Added const
+                                  style: const TextStyle( 
                                     fontSize: 11,
                                     color: Colors.green,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 )
                               else
-                                const Text( // Added const
+                                const Text( 
                                   'Candling complete',
                                   style: TextStyle(
                                     fontSize: 11,
@@ -251,18 +251,18 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1), // FIXED
+                    color: Colors.blue.withOpacity(0.1), 
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      const Icon( // Added const
+                      const Icon( 
                         Icons.info_outline,
                         color: Colors.blue,
                         size: 16,
                       ),
                       const SizedBox(width: 8),
-                      const Expanded( // Added const
+                      const Expanded( 
                         child: Text(
                           'Tap an incubator to schedule candling reminder',
                           style: TextStyle(
@@ -365,7 +365,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text( // Added const
+            const Text( 
               'Candling Scheduled Successfully!',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
@@ -418,7 +418,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header
                 Row(
                   children: [
                     const Icon(Icons.egg, color: Colors.blue, size: 28),
@@ -449,7 +448,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                 ),
                 const SizedBox(height: 20),
 
-               // Incubation Progress Section
                 _buildDetailSection(
                   'Incubation Progress',
                   Icons.schedule,
@@ -528,9 +526,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1), // FIXED
+        color: color.withOpacity(0.1), 
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)), // FIXED
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -562,208 +560,207 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   }
 
   @override
-Widget build(BuildContext context) {
-  Future<void> showProfileModal() async {
-    await showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.9,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) => Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          child: ProfileScreen(
-            incubatorData: incubatorData,
-            selectedIncubator: incubatorData.keys.isNotEmpty 
-              ? incubatorData.keys.first 
-              : '',
-            themeNotifier: widget.themeNotifier,
-            userName: widget.userName,
-            onUserNameChanged: () async {
-              // No state logic is needed here for the Analytics screen
-            },
+  Widget build(BuildContext context) {
+    Future<void> showProfileModal() async {
+      await showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+       builder: (context) => DraggableScrollableSheet(
+          initialChildSize: 0.9,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          builder: (context, scrollController) => Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: ProfileScreen(
+              incubatorData: incubatorData,
+              selectedIncubator: incubatorData.keys.isNotEmpty 
+                ? incubatorData.keys.first 
+                : '',
+              themeNotifier: widget.themeNotifier,
+              userName: widget.userName,
+              onUserNameChanged: () async {
+              },
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
+    final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
   
-  return Scaffold( // <--- Scaffold is now always present
-    appBar: AppBar( // <--- AppBar is now always present
-      title: const Text('Analytics'),
-      backgroundColor: Colors.blueAccent,
-      foregroundColor: Colors.white,
-      automaticallyImplyLeading: false, 
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.person),
-          onPressed: showProfileModal,
-        ),
-      ],
-    ),
-    body: widget.hasIncubators 
-      ? SingleChildScrollView( // <--- Show analytics content
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Your Overall Success Rate Container
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.green.shade400, Colors.green.shade300],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
+    return Scaffold(
+      appBar: AppBar( 
+        title: const Text('Analytics'),
+        backgroundColor: Colors.blueAccent,
+        foregroundColor: Colors.white,
+        automaticallyImplyLeading: false, 
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.person),
+            onPressed: showProfileModal,
+          ),
+        ],
+      ),
+      body: widget.hasIncubators 
+        ? SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Overall Success Rate Container
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.green.shade400, Colors.green.shade300],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.green.withOpacity(0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.green.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.trending_up,
+                        size: 48,
+                        color: Colors.white,
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${_calculateOverallHatchRate().toStringAsFixed(2)}%',
+                              style: const TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              'Overall Success Rate',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.white.withOpacity(0.9),
+                              ),
+                            ),
+                            Text(
+                              'From ${_getTotalCompletedBatches()} completed batches',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.white.withOpacity(0.8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                child: Row(
+
+                const SizedBox(height: 24),
+
+                // Candling Schedule Section
+                Row(
                   children: [
-                    const Icon(
-                      Icons.trending_up,
-                      size: 48,
-                      color: Colors.white,
+                    Text(
+                      'Candling Schedule',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${_calculateOverallHatchRate().toStringAsFixed(2)}%',
-                            style: const TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          Text(
-                            'Overall Success Rate',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.white.withOpacity(0.9),
-                            ),
-                          ),
-                          Text(
-                            'From ${_getTotalCompletedBatches()} completed batches',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.white.withOpacity(0.8),
-                            ),
-                          ),
-                        ],
+                    const Spacer(),
+                    Text(
+                      'Tap to schedule',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
                       ),
                     ),
                   ],
                 ),
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Candling Schedule Section
-              Row(
-                children: [
-                  Text(
-                    'Candling Schedule',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const Spacer(),
-                  Text(
-                    'Tap to schedule',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                const SizedBox(height: 16),
+
+                _buildCandlingTimeline(isDarkMode),
+
+                const SizedBox(height: 24),
+
+                // Active Batches Section
+                Row(
+                  children: [
+                    Text(
+                      'Active Batches',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              
-              _buildCandlingTimeline(isDarkMode),
-              
-              const SizedBox(height: 24),
-              
-              // Active Batches Section
-              Row(
-                children: [
-                  Text(
-                    'Active Batches',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const Spacer(),
-                  Text(
-                    'Tap for details',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                    const Spacer(),
+                    Text(
+                      'Tap for details',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              
-              ...incubatorData.entries.map((entry) => 
-                _buildClickableActiveBatchCard(entry.key, entry.value, isDarkMode)
-              ),
-              
-              const SizedBox(height: 24),
-              
-              // Batch History Section
-              Row(
-                children: [
-                  Text(
-                    'Batch History',
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleLarge
-                    ?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                  const Spacer(),
-                  Text(
-                    'Tap for details',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                ...incubatorData.entries.map((entry) => 
+                  _buildClickableActiveBatchCard(entry.key, entry.value, isDarkMode)
+                ),
+
+                const SizedBox(height: 24),
+
+                // Batch History Section
+                Row(
+                  children: [
+                    Text(
+                      'Batch History',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              
-              _buildBatchHistoryList(isDarkMode),
-            ],
+                    const Spacer(),
+                    Text(
+                      'Tap for details',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDarkMode ? const Color(0xFFB0B0B0) : Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                _buildBatchHistoryList(isDarkMode),
+              ],
+            ),
+          )
+        : const Center( 
+            child: Text(
+              "Add an incubator to view analytics.",
+              style: TextStyle(fontSize: 16),
+            ),
           ),
-        )
-      : const Center( // <--- Show empty state in the body
-          child: Text(
-            "Add an incubator to view analytics.",
-            style: TextStyle(fontSize: 16),
-          ),
-        ),
-  );
-}
+    );
+  }
 
   Widget _buildCandlingTimeline(bool isDarkMode) {
     final String nextDate = _getNextCandlingDate();
@@ -776,12 +773,12 @@ Widget build(BuildContext context) {
           color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: Colors.orange.withOpacity(0.3), // FIXED
+            color: Colors.orange.withOpacity(0.3), 
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.orange.withOpacity(0.1), // FIXED
+              color: Colors.orange.withOpacity(0.1), 
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -792,10 +789,10 @@ Widget build(BuildContext context) {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1), // FIXED
+                color: Colors.orange.withOpacity(0.1), 
                 borderRadius: BorderRadius.circular(50),
               ),
-              child: const Icon( // Added const
+              child: const Icon( 
                 Icons.visibility,
                 color: Colors.orange,
                 size: 24,
@@ -806,7 +803,7 @@ Widget build(BuildContext context) {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Row( // Added const
+                  const Row( 
                     children: [
                       Flexible(
                         child: Text(
@@ -822,7 +819,7 @@ Widget build(BuildContext context) {
                   const SizedBox(height: 4),
                   Text(
                     'Next due: $nextDate',
-                    style: const TextStyle( // Added const
+                    style: const TextStyle(
                       fontSize: 14,
                       color: Colors.orange,
                       fontWeight: FontWeight.w500,
@@ -835,10 +832,10 @@ Widget build(BuildContext context) {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1), // FIXED
+                color: Colors.orange.withOpacity(0.1), 
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: const Icon( // Added const
+              child: const Icon(
                 Icons.arrow_forward_ios,
                 color: Colors.orange,
                 size: 16,
@@ -877,12 +874,12 @@ Widget build(BuildContext context) {
           color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: statusColor.withOpacity(0.3), // FIXED
+            color: statusColor.withOpacity(0.3), 
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: statusColor.withOpacity(0.1), // FIXED
+              color: statusColor.withOpacity(0.1), 
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -896,7 +893,7 @@ Widget build(BuildContext context) {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1), // FIXED
+                    color: statusColor.withOpacity(0.1), 
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(Icons.egg, color: statusColor, size: 20),
@@ -926,7 +923,7 @@ Widget build(BuildContext context) {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1), // FIXED
+                    color: statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -1067,7 +1064,7 @@ Widget build(BuildContext context) {
               color: isDarkMode ? const Color(0xFF1E1E1E) : Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: rateColor.withOpacity(0.3), // FIXED
+                color: rateColor.withOpacity(0.3), 
                 width: 1,
               ),
             ),
@@ -1076,7 +1073,7 @@ Widget build(BuildContext context) {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: rateColor.withOpacity(0.1), // FIXED
+                    color: rateColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(

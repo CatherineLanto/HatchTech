@@ -58,9 +58,7 @@ class UserManagementScreen extends StatelessWidget {
                   'username': newUsername,
                   'role': role,
                 });
-                // Only update email if changed
                 if (newEmail != (user['email'] ?? '')) {
-                  // Assuming AuthService.updateUserEmail is defined elsewhere
                   final result = await AuthService.updateUserEmail(userId: userId, newEmail: newEmail);
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(result['message']), backgroundColor: result['success'] ? Colors.green : Colors.red));
                 } else {
@@ -86,11 +84,9 @@ class UserManagementScreen extends StatelessWidget {
         backgroundColor: Colors.blueAccent,
         foregroundColor: Colors.white,
       ),
-      // FutureBuilder to fetch *only* users invited by the owner
       body: FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        // Only queries for users whose 'invitedByUid' matches the current owner's UID
         future: FirebaseFirestore.instance.collection('users')
-          .where('invitedByUid', isEqualTo: ownerUid) 
+          .where('ownerUid', isEqualTo: ownerUid) 
           .get(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -100,15 +96,12 @@ class UserManagementScreen extends StatelessWidget {
              return Center(child: Text('Error loading users: ${snapshot.error}'));
           }
           
-          // Nested FutureBuilder to explicitly fetch the owner's data
           return FutureBuilder<DocumentSnapshot<Map<String, dynamic>>>(
              future: FirebaseFirestore.instance.collection('users').doc(ownerUid).get(),
              builder: (context, ownerSnapshot) {
                
-               // Combine the owner's data with the invited users data
                List<Map<String, dynamic>> usersList = [];
                
-               // Add owner/admin user first
                if (ownerSnapshot.hasData && ownerSnapshot.data!.exists) {
                  final ownerData = ownerSnapshot.data!.data()!;
                  usersList.add({
@@ -118,10 +111,9 @@ class UserManagementScreen extends StatelessWidget {
                  });
                }
 
-               // Add all invited users
                if (snapshot.hasData) {
                  for (var doc in snapshot.data!.docs) {
-                   if (doc.id != ownerUid) { // Avoid duplicates
+                   if (doc.id != ownerUid) { 
                      usersList.add({
                        ...doc.data(),
                        'id': doc.id,
@@ -135,7 +127,6 @@ class UserManagementScreen extends StatelessWidget {
                  return const Center(child: Text('No users connected yet.'));
                }
 
-               // Sort to ensure the owner is always at the top
                usersList.sort((a, b) {
                   if (a['id'] == ownerUid) return -1;
                   if (b['id'] == ownerUid) return 1;
@@ -160,7 +151,6 @@ class UserManagementScreen extends StatelessWidget {
                          style: TextStyle(fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.normal),
                        ),
                        subtitle: Text(
-                         // Display role nicely
                          '${user['email'] ?? 'No Email'} - ${userRole[0].toUpperCase()}${userRole.substring(1)}',
                        ),
                        trailing: isCurrentUser
@@ -170,7 +160,6 @@ class UserManagementScreen extends StatelessWidget {
                                  if (value == 'edit') {
                                    _showEditUserDialog(context, userId, user);
                                  } else if (value == 'remove') {
-                                   // Confirmation dialog before removing
                                    final confirmed = await showDialog<bool>(
                                      context: context,
                                      builder: (ctx) => AlertDialog(
@@ -195,10 +184,8 @@ class UserManagementScreen extends StatelessWidget {
                                    }
                                  }
                                },
-                               // Only allow actions on non-owner and non-current users
                                itemBuilder: (context) => [
                                  const PopupMenuItem(value: 'edit', child: Text('Edit Role')),
-                                 if (!isOwner) // Owner/Admin cannot be removed from this list
                                     const PopupMenuItem(value: 'remove', child: Text('Remove User', style: TextStyle(color: Colors.red))),
                                ],
                              ),

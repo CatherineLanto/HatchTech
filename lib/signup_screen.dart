@@ -3,6 +3,7 @@ import 'services/auth_service.dart';
 import 'services/invite_service.dart';
 import 'login_screen.dart';
 import 'auth_wrapper.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; 
 
 class SignUpScreen extends StatefulWidget {
   final ValueNotifier<ThemeMode> themeNotifier;
@@ -25,8 +26,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
   
   String? errorMessage;
   bool hasError = false;
-    String _selectedRole = 'Owner/Admin';
-    final _inviteCode = TextEditingController();
+  String _selectedRole = 'Owner/Admin';
+  final _inviteCode = TextEditingController();
 
   @override
   void initState() {
@@ -116,7 +117,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   child: ElevatedButton(
                     onPressed: () {
                       if (!mounted) return;
-                      // Close dialog and replace stack with AuthWrapper for guaranteed rebuild
                       Navigator.of(context, rootNavigator: true).pop();
                       Navigator.of(context).pushAndRemoveUntil(
                         MaterialPageRoute(
@@ -148,23 +148,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
   }
 
   void _signUp() async {
-    if (_username.text.trim().isEmpty || 
-        _email.text.trim().isEmpty || 
-        _password.text.trim().isEmpty || 
-        _confirmPassword.text.trim().isEmpty ||
-        (_selectedRole != 'Owner/Admin' && _inviteCode.text.trim().isEmpty)) {
-      setState(() {
-        hasError = true;
-        errorMessage = "Please fill in all fields";
-      });
-      return;
-    }
+    if (_username.text.trim().isEmpty ||
+      _email.text.trim().isEmpty ||
+      _password.text.trim().isEmpty ||
+      _confirmPassword.text.trim().isEmpty ||
+      (_selectedRole != 'Owner/Admin' && _inviteCode.text.trim().isEmpty)) {
+        setState(() {
+          hasError = true;
+          errorMessage = "Please fill in all fields.";
+        }); 
+        return;
+      }
 
-    if (!_email.text.contains('@')) {
-      setState(() {
-        hasError = true;
-        errorMessage = "Please enter a valid email address";
-      });
+      if (!_email.text.contains('@')) {
+        setState(() {
+          hasError = true;
+          errorMessage = "Please enter a valid email address";
+        });
       return;
     }
 
@@ -181,21 +181,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
         hasError = true;
         errorMessage = "Password must be at least 6 characters long";
       });
-      return;
-    }
-
-    String roleToAssign = _selectedRole;
-    if (_selectedRole != 'Owner/Admin') {
-      // Validate invite code and get role
-      final inviteRole = await InviteService.validateInviteCode(_inviteCode.text.trim());
-      if (inviteRole == null) {
-        setState(() {
-          hasError = true;
-          errorMessage = "Invalid or used invite code.";
-        });
         return;
-      }
-      roleToAssign = inviteRole;
     }
 
     setState(() {
@@ -204,36 +190,78 @@ class _SignUpScreenState extends State<SignUpScreen> {
       errorMessage = null;
     });
 
+    String finalRole = _selectedRole == "Owner/Admin" ? "owner" : "viewer";
+    String? ownerUid;
+    String? inviteCodeUsed;
+
+    if (_selectedRole != "Owner/Admin") {
+      final codeDoc = await FirebaseFirestore.instance
+          .collection('invite_codes')
+          .doc(_inviteCode.text.trim())
+          .get();
+
+      final data = codeDoc.data();
+
+      if (!codeDoc.exists || data == null || data['used'] == true) {
+        setState(() {
+          hasError = true;
+          errorMessage = "Invalid or used invite code.";
+          isLoading = false;
+        });
+        return;
+      }
+
+      if (!data.containsKey('ownerUid') || data['ownerUid'] == null) {
+        setState(() {
+          hasError = true;
+          errorMessage = "Invite code is missing an owner. Please ask for a new code.";
+          isLoading = false;
+        });
+        return;
+      }
+
+      ownerUid = data['ownerUid'] as String;
+      finalRole = data['role'] as String? ?? finalRole; 
+      inviteCodeUsed = _inviteCode.text.trim();
+    }
+
     final result = await AuthService.signUp(
       email: _email.text.trim(),
       password: _password.text,
       username: _username.text.trim(),
-      role: roleToAssign,
+      role: finalRole,
+      ownerUid: ownerUid,
     );
 
-    // Mark invite code as used if not Owner/Admin and registration succeeded
-    if (_selectedRole != 'Owner/Admin' && result['success']) {
-      await InviteService.markCodeUsed(_inviteCode.text.trim());
-    }
-
-    if (mounted) {
-      setState(() {
-        isLoading = false;
-      });
-    }
-
-    if (result['success']) {
-      _showSuccessDialog();
-    } else {
+    if (!result['success']) {
       if (mounted) {
         setState(() {
           hasError = true;
-          errorMessage = result['message'];
+          errorMessage = result['message'] ?? "Signup failed.";
+          isLoading = false;
         });
       }
+      return;
     }
-  }
 
+    final newUid = result['uid'];
+
+    if (_selectedRole != 'Owner/Admin' && ownerUid != null) {
+      await FirebaseFirestore.instance.collection('users').doc(newUid).set({
+        "ownerUid": ownerUid,
+        "role": finalRole,
+        "invitedBy": inviteCodeUsed,
+        "updatedAt": FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      await InviteService.markCodeUsed(inviteCodeUsed!);
+    }
+
+    if (mounted) setState(() => isLoading = false);
+
+    _showSuccessDialog();
+  }
+  
   InputDecoration _inputDecoration(String label, IconData icon) {
     final bool isDarkMode = Theme.of(context).brightness == Brightness.dark;
     
@@ -342,7 +370,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ),
                     child: Column(
                       children: [
-                        // Role selection dropdown
                         DropdownButtonFormField<String>(
                           value: _selectedRole,
                           decoration: _inputDecoration("Select Role", Icons.admin_panel_settings),
@@ -357,7 +384,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           },
                         ),
                         const SizedBox(height: 16),
-                        // Invite code input (only for non-Owner/Admin)
                         if (_selectedRole != 'Owner/Admin')
                           TextField(
                             controller: _inviteCode,

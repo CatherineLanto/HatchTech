@@ -1,5 +1,6 @@
 // ignore_for_file: avoid_print
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -7,6 +8,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'firebase_options.dart';
 import 'auth_wrapper.dart';
+import 'services/auth_service.dart';
 import 'services/notification_service.dart';
 import 'services/realtime_notification_service.dart'; 
 import 'package:hatchtech/services/notification_manager.dart';
@@ -16,16 +18,13 @@ final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterL
 
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  // Make sure Firebase is initialized
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-
-  // Extract data safely
   final title = message.notification?.title ?? message.data['title'] ?? 'HatchTech Alert';
   final body = message.notification?.body ?? message.data['body'] ?? 'Check your incubator';
 
   // Show local notification
   const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-    'hatchtech_alerts', // Must match channel ID in your app
+    'hatchtech_alerts', 
     'HatchTech Alerts',
     channelDescription: 'Sensor and batch notifications',
     importance: Importance.max,
@@ -41,10 +40,9 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     title,
     body,
     platformDetails,
-    payload: message.data['payload'] ?? '', // Optional for tapping behavior
+    payload: message.data['payload'] ?? '', 
   );
 
-  // Optional: handle custom logic in your FcmLocalNotificationService
   await FcmLocalNotificationService.instance.showNotificationFromRemoteMessage(message);
 
   print('📩 Background/terminated notification handled: ${message.messageId}');
@@ -61,11 +59,10 @@ void main() async {
   const initSettings = InitializationSettings(android: androidInit);
   await flutterLocalNotificationsPlugin.initialize(initSettings);
 
-  // Create the Android Notification Channel
   const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'hatchtech_alerts', // ID from your background handler
-    'HatchTech Alerts', // name
-    description: 'Sensor and batch notifications for HatchTech.', // description
+    'hatchtech_alerts', 
+    'HatchTech Alerts', 
+    description: 'Sensor and batch notifications for HatchTech.',
     importance: Importance.max,
     playSound: true,
   );
@@ -87,17 +84,21 @@ void main() async {
 
   final fcmToken = await FirebaseMessaging.instance.getToken();
   print('📱 FCM Token: $fcmToken');
-/*
-  try {
-    final user = AuthService.currentUser;
-    if (user != null && fcmToken != null) {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update({'fcmToken': fcmToken});
-      await FirebaseDatabase.instance.ref('fcmTokens/${user.uid}').set(fcmToken);
-    }
-  } catch (e) {
-    print('⚠️ Error saving FCM token: $e');
+
+  final user = AuthService.currentUser;
+  if (user != null && fcmToken != null) {
+    final userDocRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
+
+    await userDocRef.set({
+      'fcmTokens': FieldValue.arrayUnion([fcmToken]),
+    }, SetOptions(merge: true));
+
+   FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+      await userDocRef.set({
+        'fcmTokens': FieldValue.arrayUnion([newToken]),
+      }, SetOptions(merge: true));
+    });
   }
-*/
 
   runApp(const HatchTechApp());
 }

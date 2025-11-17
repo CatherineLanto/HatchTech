@@ -68,7 +68,6 @@ class FcmLocalNotificationService {
     BuildContext? context,
   }) async {
     AndroidNotificationDetails androidDetails;
-
     if (type == 'sensor_alert') {
       androidDetails = const AndroidNotificationDetails(
         'hatchtech_sensor_channel',
@@ -307,7 +306,7 @@ class NotificationService {
 
   void _ensureOverlay(BuildContext context) {
     if (_entry != null) return;
-  final overlay = Overlay.of(context);
+    final overlay = Overlay.of(context);
     final host = _NotificationHost(key: _hostKey);
     _entry = OverlayEntry(builder: (context) {
       return Positioned.fill(

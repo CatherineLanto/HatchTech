@@ -7,12 +7,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 class AuthService {
   static final FirebaseAuth _auth = FirebaseAuth.instance;
   static final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  // ignore: unused_field
-  static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
   static User? get currentUser => _auth.currentUser;
 
-  // ✅ Save or refresh FCM token
   static Future<void> saveFcmToken() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -24,12 +21,9 @@ class AuthService {
         return;
       }
 
-      // Fetch user doc
       final userRef = FirebaseFirestore.instance.collection('users').doc(user.uid);
       final doc = await userRef.get();
 
-      // 🧩 Allow multiple devices per account:
-      // Store tokens in an array (so each device keeps its own)
       List<dynamic> tokens = [];
       if (doc.exists && doc.data()!.containsKey('fcmTokens')) {
         tokens = List<String>.from(doc.data()!['fcmTokens']);
@@ -40,7 +34,6 @@ class AuthService {
       await userRef.update({'fcmTokens': tokens});
       print('✅ FCM token saved for ${user.email}: $token');
 
-      // Automatically update when token refreshes
       FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
         final snap = await userRef.get();
         List<dynamic> currentTokens = [];
@@ -59,7 +52,6 @@ class AuthService {
     }
   }
 
-  // ✅ Update user email
   static Future<Map<String, dynamic>> updateUserEmail({
     required String userId,
     required String newEmail,
@@ -91,12 +83,13 @@ class AuthService {
     }
   }
 
-  // ✅ Sign up with email
+  // Sign up with email
   static Future<Map<String, dynamic>> signUp({
     required String email,
     required String password,
     required String username,
-    required String role,
+    required String role, 
+    String? ownerUid,
   }) async {
     try {
       final usernameQuery = await _firestore
@@ -113,8 +106,8 @@ class AuthService {
 
       final UserCredential userCredential =
           await _auth.createUserWithEmailAndPassword(email: email, password: password);
-
-      await _firestore.collection('users').doc(userCredential.user!.uid).set({
+      
+      Map<String, dynamic> userData = {
         'username': username,
         'username_lower': username.toLowerCase(),
         'email': email,
@@ -122,22 +115,24 @@ class AuthService {
         'created_at': FieldValue.serverTimestamp(),
         'last_login': FieldValue.serverTimestamp(),
         'fcmTokens': <String, dynamic>{},
-      });
+      };
 
+      if (ownerUid != null) {
+        userData['ownerUid'] = ownerUid; 
+      }
+      
+      await _firestore.collection('users').doc(userCredential.user!.uid).set(userData);
       await userCredential.user!.updateDisplayName(username);
-
-      // 🟢 Save device FCM token
-      await saveFcmToken();
 
       return {
         'success': true,
         'message': 'Account created successfully!',
-        'user': userCredential.user,
+        'uid': userCredential.user!.uid,
       };
     } on FirebaseAuthException catch (e) {
       String message;
       switch (e.code) {
-        case 'weak-password':
+         case 'weak-password':
           message = 'The password provided is too weak.';
           break;
         case 'email-already-in-use':
@@ -147,15 +142,15 @@ class AuthService {
           message = 'Please enter a valid email address.';
           break;
         default:
-          message = 'An error occurred. Please try again.';
+          message = e.message ?? 'An unknown error occurred. Please try again.';
       }
       return {'success': false, 'message': message};
     } catch (e) {
-      return {'success': false, 'message': 'Failed to create account. Please try again.'};
+      return {'success': false, 'message': 'Failed to create account due to a system error.'};
     }
   }
 
-  // ✅ Sign in with email
+  // Sign in with email
   static Future<Map<String, dynamic>> signIn({
     required String email,
     required String password,
@@ -168,7 +163,6 @@ class AuthService {
         'last_login': FieldValue.serverTimestamp(),
       });
 
-      // 🟢 Save device FCM token
       await saveFcmToken();
 
       return {
@@ -200,7 +194,7 @@ class AuthService {
     }
   }
 
-  // ✅ Sign in with username
+  // Sign in with username
   static Future<Map<String, dynamic>> signInWithUsername({
     required String username,
     required String password,
@@ -220,7 +214,6 @@ class AuthService {
 
       final result = await signIn(email: email, password: password);
 
-      // 🟢 Save device FCM token (redundant safety)
       await saveFcmToken();
 
       return result;
@@ -229,12 +222,12 @@ class AuthService {
     }
   }
 
-  // ✅ Sign out
+  // Sign out
   static Future<void> signOut() async {
     await _auth.signOut();
   }
 
-  // ✅ Reset password
+  //  Reset password
   static Future<Map<String, dynamic>> resetPassword({required String email}) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
@@ -266,9 +259,7 @@ class AuthService {
         .doc(user.uid)
         .get();
 
-    // THIS IS THE LINE THAT PREVENTS THE CRASH
     if (!docSnapshot.exists) {
-      // If the Firestore document is missing, clear the Auth session and return null.
       await FirebaseAuth.instance.signOut(); 
       return null; 
     }
@@ -276,7 +267,6 @@ class AuthService {
     return docSnapshot.data();
   }
   
-  // You might also have a stream version:
   static Stream<Map<String, dynamic>?> getUserDataStream() {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return Stream.value(null);
@@ -286,16 +276,14 @@ class AuthService {
         .doc(user.uid)
         .snapshots()
         .map((snapshot) {
-            // Check for existence on every snapshot event
             if (!snapshot.exists) {
-                // Cannot sign out in a stream map, but at least we return null safely
                 return null;
             }
             return snapshot.data();
         });
   }
 
-  // ✅ Update username
+  // Update username
   static Future<Map<String, dynamic>> updateUserProfile({
     required String username,
   }) async {
@@ -335,7 +323,7 @@ class AuthService {
     }
   }
 
-  // ✅ Utility
+  // Utility
   static bool get isLoggedIn => currentUser != null;
 
   static Future<bool> isNewUser() async {

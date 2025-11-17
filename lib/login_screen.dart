@@ -72,7 +72,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
     Map<String, dynamic> result;
 
-    // Check if input is email or username
     if (inputUsername.contains('@')) {
       // Sign in with email
       result = await AuthService.signIn(
@@ -94,7 +93,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (result['success']) {
-      // Login successful, replace stack with AuthWrapper for guaranteed rebuild
       if (!mounted) return;
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(

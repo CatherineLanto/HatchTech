@@ -1,5 +1,3 @@
-// Utility functions for analytics calculations used across screens
-
 double calculateOverallHatchRate(List<Map<String, dynamic>> batchHistory) {
   if (batchHistory.isEmpty) return 0.0;
   double totalSuccessRate = 0.0;
@@ -60,5 +58,5 @@ String getNextCandlingDate(Map<String, Map<String, dynamic>> incubatorData, List
     final DateTime nd = nextCandling!;
     return '${nd.day}/${nd.month}/${nd.year}';
   }
-  return 'No active batches';
+  return 'Schedule';
 }

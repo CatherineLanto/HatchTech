@@ -74,9 +74,9 @@ class RealtimeNotificationService {
   void startListening() {
     final ref = FirebaseDatabase.instance.ref('HatchTech');
     if (FirebaseAuth.instance.currentUser == null) {
-        print('Skipping Realtime DB notification: User not logged in.');
-        return; 
-      }
+      print('Skipping Realtime DB notification: User not logged in.');
+      return; 
+    }
 
     ref.onValue.listen((DatabaseEvent event) {
       final data = event.snapshot.value as Map?;

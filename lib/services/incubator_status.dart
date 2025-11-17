@@ -13,7 +13,6 @@ class IncubatorStatusService {
       final int? timestampMillis = event.snapshot.value as int?;
       
       if (timestampMillis == null) {
-        // If the node doesn't exist, it's considered off
         return false;
       }
 
@@ -21,10 +20,8 @@ class IncubatorStatusService {
           DateTime.fromMillisecondsSinceEpoch(timestampMillis);
       final DateTime now = DateTime.now();
 
-      // Define the offline threshold (e.g., 60 seconds)
       const Duration offlineThreshold = Duration(seconds: 60);
 
-      // If the last update was less than the threshold ago, it's ON
       return now.difference(lastOnline) < offlineThreshold;
     });
   }
