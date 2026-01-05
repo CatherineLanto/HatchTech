@@ -628,7 +628,7 @@ class _OverviewPageState extends State<OverviewPage> {
                                 return const Center(child: CircularProgressIndicator());
                               } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
                                 return const Text(
-                                  "No recent maintenance records found.",
+                                  "Nothing recent, check logs for records.",
                                   style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic),
                                 );
                               }
@@ -877,48 +877,72 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
   Widget buildMaintenanceSection() {
-    return StreamBuilder(
-      stream: FirebaseDatabase.instance
-          .ref("HatchTech/$selectedIncubator/maintenance")
-          .onValue,
-      builder: (context, snapshot) {
-        final rawValue = snapshot.data!.snapshot.value;
-        if (rawValue is Map) {
-          final Map<String, dynamic> data = Map<String, dynamic>.from(rawValue);
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text("⚙️ Predictive Maintenance Alerts",
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                const SizedBox(height: 8),
-                ...data.entries.map((entry) => Card(
-                margin: const EdgeInsets.symmetric(vertical: 4),
+  return StreamBuilder(
+    stream: FirebaseDatabase.instance
+        .ref("HatchTech/$selectedIncubator/maintenance")
+        .onValue,
+    builder: (context, snapshot) {
+      if (!snapshot.hasData || snapshot.data == null) {
+        return const Text("No current maintenance alerts ✅");
+      }
+
+      final rawValue = snapshot.data!.snapshot.value;
+
+      if (rawValue == null) {
+        return const Text("No current maintenance alerts ✅");
+      }
+
+      if (rawValue is Map) {
+        final Map<String, dynamic> data =
+            Map<String, dynamic>.from(rawValue);
+
+        if (data.isEmpty) {
+          return const Text("No current maintenance alerts ✅");
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              "⚙️ Predictive Maintenance Alerts",
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 8),
+            ...data.entries.map((entry) => Card(
+                  margin: const EdgeInsets.symmetric(vertical: 4),
                   child: ListTile(
-                    leading: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                    leading: const Icon(Icons.warning_amber_rounded,
+                        color: Colors.orange),
                     title: Text(entry.key.toUpperCase()),
                     subtitle: Text(entry.value.toString()),
                   ),
                 )),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton( 
-                    onPressed: () { 
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => MaintenanceLogPage(incubatorId: selectedIncubator, userName: currentUserName, themeNotifier: widget.themeNotifier, hasIncubators: widget.hasIncubators, ),
-                        ),
-                      );
-                    },
-                    child: const Text("View All →"),
-                  ),
-                ),
-             ],
-            );
-          } else {
-            return const Text("No current maintenance alerts ✅");
-          }
-          },
-    );
-  }
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => MaintenanceLogPage(
+                        incubatorId: selectedIncubator,
+                        userName: currentUserName,
+                        themeNotifier: widget.themeNotifier,
+                        hasIncubators: widget.hasIncubators,
+                      ),
+                    ),
+                  );
+                },
+                child: const Text("View All →"),
+              ),
+            ),
+          ],
+        );
+      }
+
+      return const Text("No current maintenance alerts ✅");
+    },
+  );
+}
+
 }

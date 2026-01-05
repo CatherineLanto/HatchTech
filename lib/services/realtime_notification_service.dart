@@ -216,7 +216,7 @@ class RealtimeNotificationService {
         print('Skipping Batch Reminder listener: User not logged in.');
         return; 
     }
-    final firestore = FirebaseFirestore.instance.collection('batchHistory');
+    final firestore = FirebaseFirestore.instance.collection('incubators');
 
     firestore.where('isDone', isEqualTo: false).snapshots().listen((snapshot) {
       if (FirebaseAuth.instance.currentUser == null) {

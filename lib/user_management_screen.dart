@@ -140,7 +140,6 @@ class UserManagementScreen extends StatelessWidget {
                    final userId = user['id'] as String;
                    final isCurrentUser = userId == currentUserId;
                    final userRole = (user['role'] ?? 'user').toString();
-                   final isOwner = user['id'] == ownerUid;
 
                    return Card(
                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
